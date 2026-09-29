@@ -32,7 +32,7 @@ export function AppHeader(props: Props) {
     props
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-primary text-primary-foreground pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-40 border-b bg-header text-header-foreground pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex h-14 max-w-xl items-center gap-2 px-4">
         <Button
           variant="secondary"

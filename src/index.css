@@ -1,13 +1,16 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/bitter";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-heading: 'Bitter Variable', Georgia, serif;
+    --font-sans: 'Inter Variable', sans-serif;
+    --color-header: var(--header);
+    --color-header-foreground: var(--header-foreground);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,39 +51,52 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Zeker en Mobiel brand (zekerenmobiel.nl): navy ink, orange call-to-action, teal accents, cream surfaces. */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.47 0.09 252);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --zm-navy: #0a2e42;
+    --zm-orange: #ff8a3c;
+    --zm-orange-dark: #e67328;
+    --zm-teal: #167a8a;
+    --zm-teal-dark: #11606d;
+    --zm-teal-soft: #e5f1f3;
+    --zm-cream: #f6efe1;
+    --zm-cream-light: #faf5ea;
+    --zm-ink-muted: #3f5a6c;
+
+    --background: var(--zm-cream-light);
+    --foreground: var(--zm-navy);
+    --card: #ffffff;
+    --card-foreground: var(--zm-navy);
+    --popover: #ffffff;
+    --popover-foreground: var(--zm-navy);
+    --primary: var(--zm-orange);
+    --primary-foreground: var(--zm-navy);
+    --secondary: var(--zm-teal-soft);
+    --secondary-foreground: var(--zm-teal-dark);
+    --muted: var(--zm-cream);
+    --muted-foreground: var(--zm-ink-muted);
+    --accent: var(--zm-teal-soft);
+    --accent-foreground: var(--zm-navy);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --border: rgba(10, 46, 66, 0.12);
+    --input: rgba(10, 46, 66, 0.22);
+    --ring: var(--zm-teal);
+    --header: var(--zm-navy);
+    --header-foreground: #ffffff;
+    --chart-1: var(--zm-orange);
+    --chart-2: var(--zm-teal);
+    --chart-3: var(--zm-navy);
+    --chart-4: var(--zm-orange-dark);
+    --chart-5: var(--zm-teal-dark);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: var(--zm-cream-light);
+    --sidebar-foreground: var(--zm-navy);
+    --sidebar-primary: var(--zm-orange);
+    --sidebar-primary-foreground: var(--zm-navy);
+    --sidebar-accent: var(--zm-teal-soft);
+    --sidebar-accent-foreground: var(--zm-navy);
+    --sidebar-border: rgba(10, 46, 66, 0.12);
+    --sidebar-ring: var(--zm-teal);
 }
 
 .dark {

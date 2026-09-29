@@ -65,7 +65,7 @@ export function LoginPage() {
               <Field>
                 <div className="flex items-center justify-between">
                   <FieldLabel htmlFor="password">Wachtwoord</FieldLabel>
-                  <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={handleForgotPassword}>
+                  <Button type="button" variant="link" size="sm" className="h-auto p-0 text-secondary-foreground" onClick={handleForgotPassword}>
                     Wachtwoord vergeten?
                   </Button>
                 </div>

@@ -67,7 +67,7 @@ export function AdminPage({ currentUserId, onBack }: { currentUserId: string; on
 
   return (
     <div className="min-h-svh bg-muted">
-      <header className="sticky top-0 z-40 border-b bg-primary pt-[env(safe-area-inset-top)] text-primary-foreground">
+      <header className="sticky top-0 z-40 border-b bg-header pt-[env(safe-area-inset-top)] text-header-foreground">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4">
           <Button variant="secondary" size="icon" aria-label="Terug naar formulier" onClick={onBack}>
             <ArrowLeftIcon />
