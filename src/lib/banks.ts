@@ -26,5 +26,5 @@ export function suggestBanks(normalizedIban: string) {
   const match = PARTIAL_NL_IBAN.exec(normalizedIban)
   if (!match) return []
   const typed = match[1]
-  return DUTCH_BANKS.filter((bank) => bank.code.startsWith(typed)).slice(0, 6)
+  return DUTCH_BANKS.filter((bank) => bank.code.startsWith(typed))
 }
