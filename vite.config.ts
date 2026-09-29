@@ -15,7 +15,7 @@ export default defineConfig({
         name: 'Bellijst',
         short_name: 'Bellijst',
         description: 'Sales formulier Zeker en Mobiel',
-        theme_color: '#0a2e42',
+        theme_color: '#35608f',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
