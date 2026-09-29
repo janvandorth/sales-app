@@ -462,14 +462,14 @@ function BankSuggestions({ iban, onPick }: { iban: string; onPick: (code: string
           key={bank.code}
           type="button"
           variant="outline"
-          size="xs"
+          className="font-normal"
+          aria-label={`${bank.code} (${bank.name})`}
           onClick={() => {
             onPick(bank.code)
             document.getElementById("iban")?.focus()
           }}
         >
-          <span className="font-mono font-semibold">{bank.code}</span>
-          <span className="text-muted-foreground">{bank.name}</span>
+          {bank.code}
         </Button>
       ))}
     </div>
