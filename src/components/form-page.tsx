@@ -5,15 +5,16 @@ import { toast } from "sonner"
 import type { Session } from "@supabase/supabase-js"
 import { formSchema, normalizeIban, type ExtractedFields, type FormInput, type FormValues } from "@shared/form-schema"
 import { AppHeader } from "@/components/app-header"
+import { OutboxDialog } from "@/components/outbox-dialog"
 import { FIELD_ORDER, SalesForm } from "@/components/sales-form"
 import { Spinner } from "@/components/ui/spinner"
 import { useOnline } from "@/hooks/use-online"
 import { useOutbox } from "@/hooks/use-outbox"
 import { useProfile } from "@/hooks/use-profile"
-import { ApiError, extractFromPhoto, getAppConfig } from "@/lib/api"
+import { ApiError, extractFromPhoto } from "@/lib/api"
 import { createEmptyForm } from "@/lib/form-defaults"
 import { prepareScanImage } from "@/lib/image"
-import { clearDraft, loadDraft, saveDraft } from "@/lib/offline-store"
+import { clearDraft, loadDraft, saveDraft, type QueuedSubmission } from "@/lib/offline-store"
 import { supabase } from "@/lib/supabase"
 
 // Scan fill animation: text fields are "typed", choices are set at once.
@@ -49,7 +50,7 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
   const rowId = useWatch({ control: form.control, name: "rowId" })
   const [ready, setReady] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [scanEnabled, setScanEnabled] = useState(false)
+  const [outboxOpen, setOutboxOpen] = useState(false)
   const [busy, setBusy] = useState<"scanning" | "filling" | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -75,13 +76,6 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
     }
   }, [ready, userId, form])
 
-  useEffect(() => {
-    if (!online) return
-    getAppConfig()
-      .then((config) => setScanEnabled(config.scanEnabled))
-      .catch(() => setScanEnabled(false))
-  }, [online])
-
   async function handleSubmit(values: FormValues) {
     setSubmitting(true)
     try {
@@ -103,6 +97,15 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
     form.reset(createEmptyForm())
     window.scrollTo({ top: 0, behavior: "smooth" })
     toast("Nieuw formulier gestart")
+  }
+
+  /** Moves a queued form back into the editor, e.g. to fix a rejected field. */
+  async function handleEditQueued(item: QueuedSubmission) {
+    await outbox.remove(item.values.rowId)
+    form.reset(item.values)
+    setOutboxOpen(false)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+    toast("Formulier uit de wachtrij geopend")
   }
 
   async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -157,7 +160,7 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
     await form.trigger(filled)
   }
 
-  const scanDisabledReason = !scanEnabled ? "Scannen is nog niet geconfigureerd" : !online ? "Scannen werkt alleen online" : null
+  const scanDisabledReason = online ? null : "Scannen werkt alleen online"
 
   return (
     <div className="min-h-svh bg-muted">
@@ -170,11 +173,12 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
         onScan={() => fileInput.current?.click()}
         outbox={outbox.items}
         syncing={outbox.syncing}
-        onSync={outbox.flush}
+        onOpenOutbox={() => setOutboxOpen(true)}
         onOpenAdmin={onOpenAdmin}
         onSignOut={async () => {
           await clearDraft(userId)
-          await supabase.auth.signOut()
+          // Only this device: a global sign-out would also kill sessions on the recruiter's other devices.
+          await supabase.auth.signOut({ scope: "local" })
         }}
       />
       <input ref={fileInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
@@ -192,6 +196,17 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
           <Spinner className="size-6" />
         </div>
       )}
+
+      <OutboxDialog
+        open={outboxOpen}
+        onOpenChange={setOutboxOpen}
+        items={outbox.items}
+        online={online}
+        syncing={outbox.syncing}
+        onSync={outbox.flush}
+        onEdit={handleEditQueued}
+        onDelete={outbox.remove}
+      />
 
       {busy && (
         <div

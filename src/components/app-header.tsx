@@ -25,13 +25,13 @@ type Props = {
   onScan: () => void
   outbox: QueuedSubmission[]
   syncing: boolean
-  onSync: () => void
+  onOpenOutbox: () => void
   onSignOut: () => void
   onOpenAdmin: () => void
 }
 
 export function AppHeader(props: Props) {
-  const { profile, email, online, scanEnabled, scanDisabledReason, onScan, outbox, syncing, onSync, onSignOut, onOpenAdmin } =
+  const { profile, email, online, scanEnabled, scanDisabledReason, onScan, outbox, syncing, onOpenOutbox, onSignOut, onOpenAdmin } =
     props
 
   return (
@@ -60,7 +60,7 @@ export function AppHeader(props: Props) {
           </Badge>
         )}
         {outbox.length > 0 && (
-          <Button variant="ghost" className={HEADER_BUTTON} size="sm" onClick={onSync} disabled={!online || syncing} aria-label="Wachtrij versturen">
+          <Button variant="ghost" className={HEADER_BUTTON} size="sm" onClick={onOpenOutbox} aria-label="Wachtrij bekijken">
             <RefreshCwIcon className={cn(syncing && "animate-spin")} />
             {outbox.length}
           </Button>
@@ -80,10 +80,10 @@ export function AppHeader(props: Props) {
             {outbox.length > 0 && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                  {outbox.length} formulier(en) in wachtrij
-                  {outbox.some((item) => item.lastError) && " — sommige zijn geweigerd door de server"}
-                </DropdownMenuLabel>
+                <DropdownMenuItem onClick={onOpenOutbox}>
+                  <RefreshCwIcon /> Wachtrij ({outbox.length})
+                  {outbox.some((item) => item.lastError) && <span className="ml-auto text-xs text-destructive">geweigerd</span>}
+                </DropdownMenuItem>
               </>
             )}
             <DropdownMenuSeparator />

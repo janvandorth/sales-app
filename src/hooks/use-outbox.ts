@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import type { FormInput } from "@shared/form-schema"
 import { useOnline } from "@/hooks/use-online"
-import { ApiError, NetworkError, submitForm } from "@/lib/api"
+import { AuthError, NetworkError, submitForm } from "@/lib/api"
 import { enqueue, loadOutbox, markOutboxError, removeFromOutbox, type QueuedSubmission } from "@/lib/offline-store"
 
 const RETRY_INTERVAL_MS = 30_000
@@ -28,7 +28,8 @@ export function useOutbox(userId: string) {
           await removeFromOutbox(userId, item.values.rowId)
           sent++
         } catch (error) {
-          if (error instanceof NetworkError) break
+          // Not the form's fault: keep it queued and try again later (after reconnecting or logging in again).
+          if (error instanceof NetworkError || error instanceof AuthError) break
           const message = error instanceof Error ? error.message : "Versturen mislukt"
           await markOutboxError(userId, item.values.rowId, message)
         }
@@ -63,8 +64,7 @@ export function useOutbox(userId: string) {
           await submitForm(values)
           return "sent"
         } catch (error) {
-          if (error instanceof ApiError) throw error
-          if (!(error instanceof NetworkError)) throw error
+          if (!(error instanceof NetworkError || error instanceof AuthError)) throw error
         }
       }
       await enqueue(userId, values)
@@ -74,5 +74,13 @@ export function useOutbox(userId: string) {
     [userId, refresh],
   )
 
-  return { items, syncing, submit, flush }
+  const remove = useCallback(
+    async (rowId: string) => {
+      await removeFromOutbox(userId, rowId)
+      await refresh()
+    },
+    [userId, refresh],
+  )
+
+  return { items, syncing, submit, flush, remove }
 }

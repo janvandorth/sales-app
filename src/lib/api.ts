@@ -1,4 +1,9 @@
-import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js"
+import {
+  FunctionsFetchError,
+  FunctionsHttpError,
+  FunctionsRelayError,
+  isAuthRetryableFetchError,
+} from "@supabase/supabase-js"
 import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import { supabase } from "@/lib/supabase"
@@ -16,12 +21,19 @@ export class ApiError extends Error {
   }
 }
 
-async function invoke<T>(name: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+/** Thrown when the session is no longer valid (e.g. revoked). The user has been signed out on this device. */
+export class AuthError extends Error {}
+
+async function invoke<T>(name: string, body: Record<string, unknown>, signal?: AbortSignal, isRetry = false): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>(name, { body, signal })
   if (!error) return data as T
 
   if (error instanceof FunctionsHttpError) {
     const response = error.context as Response
+    if (response.status === 401 && !isRetry) {
+      await recoverSession()
+      return invoke(name, body, signal, true)
+    }
     const payload = await response.json().catch(() => ({}))
     throw new ApiError(payload.error ?? "Er ging iets mis", response.status)
   }
@@ -30,6 +42,18 @@ async function invoke<T>(name: string, body: Record<string, unknown>, signal?: A
     throw new NetworkError("Geen verbinding met de server")
   }
   throw error
+}
+
+/**
+ * The server rejected our access token although it may not have expired yet, e.g. because the session was
+ * revoked. Try a refresh; if the session is really gone, sign out on this device so the login screen shows.
+ */
+async function recoverSession(): Promise<void> {
+  const { error } = await supabase.auth.refreshSession()
+  if (!error) return
+  if (isAuthRetryableFetchError(error)) throw new NetworkError("Geen verbinding met de server")
+  await supabase.auth.signOut({ scope: "local" })
+  throw new AuthError("Je sessie is verlopen, log opnieuw in")
 }
 
 export type PostcodeResult = { found: true; straat: string; plaats: string } | { found: false }
@@ -42,10 +66,6 @@ export type IbanResult = { valid: boolean; iban: string; bank?: string | null; b
 
 export function validateIban(iban: string, signal?: AbortSignal) {
   return invoke<IbanResult>("iban-validate", { iban }, signal)
-}
-
-export function getAppConfig() {
-  return invoke<{ scanEnabled: boolean; scanMock: boolean }>("app-config", {})
 }
 
 export function submitForm(values: FormInput) {

@@ -19,7 +19,6 @@ supabase/
     iban-validate            Mod-97 check + proxy to Zeker en Mobiel IBAN API
     extract-form             Photo -> Claude -> structured fields
     submit-form              Validates, stores in `submissions`, appends to Google Sheet
-    app-config               Feature flags for the client (scan enabled?)
 ```
 
 ## Development
