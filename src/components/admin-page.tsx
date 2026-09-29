@@ -11,6 +11,7 @@ import {
   UserPlusIcon,
 } from "lucide-react"
 import type { AdminUser } from "@shared/admin-types"
+import { HEADER_BUTTON } from "@/components/app-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -69,11 +70,11 @@ export function AdminPage({ currentUserId, onBack }: { currentUserId: string; on
     <div className="min-h-svh bg-muted">
       <header className="sticky top-0 z-40 border-b bg-primary pt-[env(safe-area-inset-top)] text-primary-foreground">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-4">
-          <Button variant="secondary" size="icon" aria-label="Terug naar formulier" onClick={onBack}>
+          <Button variant="ghost" className={HEADER_BUTTON} size="icon" aria-label="Terug naar formulier" onClick={onBack}>
             <ArrowLeftIcon />
           </Button>
           <h1 className="flex-1 text-center text-lg font-semibold">Beheer wervers</h1>
-          <Button variant="secondary" size="icon" aria-label="Vernieuwen" onClick={load}>
+          <Button variant="ghost" className={HEADER_BUTTON} size="icon" aria-label="Vernieuwen" onClick={load}>
             <RefreshCwIcon />
           </Button>
         </div>

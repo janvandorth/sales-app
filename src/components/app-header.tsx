@@ -13,6 +13,9 @@ import type { Profile } from "@/hooks/use-profile"
 import type { QueuedSubmission } from "@/lib/offline-store"
 import { cn } from "@/lib/utils"
 
+/** Buttons on the navy header: translucent white so they read as clickable on a dark background. */
+export const HEADER_BUTTON = "bg-white/15 text-white hover:bg-white/25 hover:text-white"
+
 type Props = {
   profile: Profile | null
   email: string
@@ -35,7 +38,8 @@ export function AppHeader(props: Props) {
     <header className="sticky top-0 z-40 border-b bg-primary text-primary-foreground pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex h-14 max-w-xl items-center gap-2 px-4">
         <Button
-          variant="secondary"
+          variant="ghost"
+          className={HEADER_BUTTON}
           size="icon"
           aria-label="Formulier scannen met camera"
           title={scanDisabledReason ?? "Formulier scannen"}
@@ -45,7 +49,10 @@ export function AppHeader(props: Props) {
           <CameraIcon />
         </Button>
 
-        <h1 className="flex-1 text-center text-lg font-semibold">Bellijst</h1>
+        <h1 className="flex flex-1 justify-center">
+          {/* Same treatment as the footer on zekerenmobiel.nl: the color logo rendered white. */}
+          <img src="/logo.png" alt="Zeker & Mobiel — Bellijst" className="h-6 w-auto brightness-0 invert" />
+        </h1>
 
         {!online && (
           <Badge variant="secondary" className="gap-1">
@@ -53,7 +60,7 @@ export function AppHeader(props: Props) {
           </Badge>
         )}
         {outbox.length > 0 && (
-          <Button variant="secondary" size="sm" onClick={onSync} disabled={!online || syncing} aria-label="Wachtrij versturen">
+          <Button variant="ghost" className={HEADER_BUTTON} size="sm" onClick={onSync} disabled={!online || syncing} aria-label="Wachtrij versturen">
             <RefreshCwIcon className={cn(syncing && "animate-spin")} />
             {outbox.length}
           </Button>
@@ -61,7 +68,7 @@ export function AppHeader(props: Props) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="icon" aria-label="Account">
+            <Button variant="ghost" className={HEADER_BUTTON} size="icon" aria-label="Account">
               <UserIcon />
             </Button>
           </DropdownMenuTrigger>

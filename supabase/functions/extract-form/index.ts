@@ -10,7 +10,8 @@ import {
 } from "../_shared/form-schema.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 
-const MODEL = "claude-opus-5-5"
+// Reading a form is a simple visual task; Sonnet at low effort keeps the scan fast.
+const MODEL = "claude-sonnet-5-5"
 const BUCKET = "scans"
 
 const SYSTEM_PROMPT = `Je leest foto's van ingevulde (vaak handgeschreven) Nederlandse verkoopformulieren van Zeker en Mobiel uit en zet de gegevens om naar gestructureerde velden.
@@ -115,7 +116,7 @@ serve(async (req) => {
     // @ts-expect-error `fallbacks: "default"` is newer than some SDK typings.
     fallbacks: "default",
     output_config: {
-      effort: "medium",
+      effort: "low",
       format: { type: "json_schema", schema: extractionSchema },
     },
     system: SYSTEM_PROMPT,
