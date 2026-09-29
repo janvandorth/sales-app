@@ -87,7 +87,7 @@ export const formSchema = z
 export type FormInput = z.input<typeof formSchema>
 export type FormValues = z.output<typeof formSchema>
 
-/** Fields Claude may extract from a photographed paper form. */
+/** Fields Claude may extract from a photographed paper form. Opmerkingen is digital-only, so never extracted. */
 export const EXTRACTABLE_FIELDS = [
   "klantnummer",
   "geslacht",
@@ -103,7 +103,6 @@ export const EXTRACTABLE_FIELDS = [
   "iban",
   "contractType",
   "betaalperiode",
-  "opmerkingen",
 ] as const satisfies readonly (keyof FormInput)[]
 
 export type ExtractedFields = Partial<Record<(typeof EXTRACTABLE_FIELDS)[number], string>>

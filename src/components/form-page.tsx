@@ -31,7 +31,6 @@ const TYPED_FIELDS = new Set<keyof FormInput>([
   "telefoon",
   "email",
   "iban",
-  "opmerkingen",
 ])
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 

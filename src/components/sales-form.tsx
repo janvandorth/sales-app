@@ -44,6 +44,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useDebouncedCheck, type CheckState } from "@/hooks/use-debounced-check"
 import { lookupPostcode, validateIban } from "@/lib/api"
+import { suggestBanks } from "@/lib/banks"
 
 type Form = UseFormReturn<FormInput, unknown, FormValues>
 
@@ -232,6 +233,10 @@ export function SalesForm({ form, submitting, onSubmit, onDiscard }: Props) {
               addon={<CheckIndicator state={ibanCheck} isValid={(data) => data.valid} />}
               description={ibanDescription(ibanCheck)}
             />
+            <BankSuggestions
+              iban={normalizedIban}
+              onPick={(code) => setValue("iban", `${normalizedIban.slice(0, 4)} ${code} `, { shouldDirty: true })}
+            />
             <ChoiceField control={control} name="contractType" label="Contracttype" options={CONTRACT_TYPE_OPTIONS} columns={2} />
             <ChoiceField control={control} name="betaalperiode" label="Betaaltermijn" options={BETAALPERIODE_OPTIONS} />
             <Controller
@@ -305,7 +310,6 @@ export const FIELD_ORDER = [
   "iban",
   "contractType",
   "betaalperiode",
-  "opmerkingen",
 ] as const satisfies readonly FieldPath<FormInput>[]
 
 type StringField = {
@@ -444,6 +448,31 @@ function PhoneField({ control }: { control: Control<FormInput, unknown, FormValu
         }
       />
     </Field>
+  )
+}
+
+/** While a Dutch IBAN is being typed, offers the bank codes that match what was typed so far. */
+function BankSuggestions({ iban, onPick }: { iban: string; onPick: (code: string) => void }) {
+  const banks = suggestBanks(iban)
+  if (banks.length === 0) return null
+  return (
+    <div className="-mt-3 flex flex-wrap gap-1.5" aria-label="Bankcode suggesties">
+      {banks.map((bank) => (
+        <Button
+          key={bank.code}
+          type="button"
+          variant="outline"
+          size="xs"
+          onClick={() => {
+            onPick(bank.code)
+            document.getElementById("iban")?.focus()
+          }}
+        >
+          <span className="font-mono font-semibold">{bank.code}</span>
+          <span className="text-muted-foreground">{bank.name}</span>
+        </Button>
+      ))}
+    </div>
   )
 }
 

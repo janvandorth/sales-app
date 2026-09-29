@@ -42,7 +42,6 @@ const extractionSchema = {
     iban: { type: "string" },
     contractType: { type: "string", enum: [...CONTRACT_TYPE_OPTIONS, ""] },
     betaalperiode: { type: "string", enum: [...BETAALPERIODE_OPTIONS, ""] },
-    opmerkingen: { type: "string" },
   },
   required: [...EXTRACTABLE_FIELDS],
 }
@@ -63,7 +62,6 @@ const extractionResult = z.object({
   iban: z.string(),
   contractType: z.enum([...CONTRACT_TYPE_OPTIONS, ""]),
   betaalperiode: z.enum([...BETAALPERIODE_OPTIONS, ""]),
-  opmerkingen: z.string(),
 })
 
 // Used until ANTHROPIC_API_KEY is configured, so the scan flow can be demonstrated end to end.
@@ -82,7 +80,6 @@ const MOCK_RESULT: z.infer<typeof extractionResult> = {
   iban: "NL91ABNA0417164300",
   contractType: "Service",
   betaalperiode: "Maand Machtiging",
-  opmerkingen: "Graag bellen na 18:00",
 }
 const MOCK_DELAY_MS = 2500
 
