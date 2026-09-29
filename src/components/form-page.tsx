@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import type { Session } from "@supabase/supabase-js"
@@ -30,6 +30,8 @@ export function FormPage({ session }: { session: Session }) {
     defaultValues: createEmptyForm(),
     mode: "onTouched",
   })
+  // A new rowId means a new form; it is used as the SalesForm key so its local state resets too.
+  const rowId = useWatch({ control: form.control, name: "rowId" })
   const [ready, setReady] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [scanEnabled, setScanEnabled] = useState(false)
@@ -80,6 +82,13 @@ export function FormPage({ session }: { session: Session }) {
     }
   }
 
+  async function handleDiscard() {
+    await clearDraft(userId)
+    form.reset(createEmptyForm())
+    window.scrollTo({ top: 0, behavior: "smooth" })
+    toast("Nieuw formulier gestart")
+  }
+
   async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
     const photo = event.target.files?.[0]
     event.target.value = ""
@@ -87,10 +96,11 @@ export function FormPage({ session }: { session: Session }) {
 
     setBusy("scanning")
     try {
-      const fields = await extractFromPhoto(userId, await prepareScanImage(photo))
+      const { fields, mock } = await extractFromPhoto(userId, await prepareScanImage(photo))
       setBusy("filling")
       await animateFill(fields)
-      toast.success("Formulier ingevuld — controleer de gegevens")
+      if (mock) toast.info("Demo: voorbeeldgegevens ingevuld (Claude is nog niet gekoppeld)")
+      else toast.success("Formulier ingevuld — controleer de gegevens")
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Uitlezen van de foto is mislukt")
     } finally {
@@ -142,7 +152,13 @@ export function FormPage({ session }: { session: Session }) {
       <input ref={fileInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
 
       {ready ? (
-        <SalesForm key={form.getValues("rowId")} form={form} submitting={submitting} onSubmit={handleSubmit} />
+        <SalesForm
+          key={rowId}
+          form={form}
+          submitting={submitting}
+          onSubmit={handleSubmit}
+          onDiscard={handleDiscard}
+        />
       ) : (
         <div className="flex justify-center p-12">
           <Spinner className="size-6" />

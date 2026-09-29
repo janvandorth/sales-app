@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import { Controller, useWatch, type Control, type FieldPath, type UseFormReturn } from "react-hook-form"
-import { CheckCircle2Icon, PencilIcon, SendIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, PencilIcon, SendIcon, Trash2Icon, XCircleIcon } from "lucide-react"
 import {
   BETAALPERIODE_OPTIONS,
   CONTRACT_TYPE_OPTIONS,
@@ -12,6 +12,17 @@ import {
   type FormValues,
 } from "@shared/form-schema"
 import { CountryCodePicker } from "@/components/country-code-picker"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -40,10 +51,11 @@ type Props = {
   form: Form
   submitting: boolean
   onSubmit: (values: FormValues) => void
+  onDiscard: () => void
 }
 
-export function SalesForm({ form, submitting, onSubmit }: Props) {
-  const { control, setValue, setError, handleSubmit } = form
+export function SalesForm({ form, submitting, onSubmit, onDiscard }: Props) {
+  const { control, setValue, handleSubmit } = form
   const [postcode, huisnummer, iban, perPost] = useWatch({
     control,
     name: ["postcode", "huisnummer", "iban", "perPost"],
@@ -85,14 +97,30 @@ export function SalesForm({ form, submitting, onSubmit }: Props) {
   // --- IBAN validation -------------------------------------------------------------------------
   const normalizedIban = normalizeIban(iban)
   const ibanCheck = useDebouncedCheck(normalizedIban.length >= 15 ? normalizedIban : null, validateIban)
-  const ibanInvalid = ibanCheck.status === "done" && !ibanCheck.data.valid
 
-  const submit = handleSubmit((values) => {
-    if (ibanInvalid) {
-      setError("iban", { message: "IBAN is afgekeurd door de controle" }, { shouldFocus: true })
-      return
+  // An invalid IBAN may be sent, but when online the user has to confirm it first.
+  const [checkingIban, setCheckingIban] = useState(false)
+  const [pendingInvalidIban, setPendingInvalidIban] = useState<FormValues | null>(null)
+
+  const submit = handleSubmit(async (values) => {
+    if (!navigator.onLine) return onSubmit(values)
+
+    let valid: boolean | null = null
+    if (ibanCheck.status === "done" && ibanCheck.data.iban === values.iban) {
+      valid = ibanCheck.data.valid
+    } else {
+      setCheckingIban(true)
+      try {
+        valid = (await validateIban(values.iban, AbortSignal.timeout(8000))).valid
+      } catch {
+        valid = null // Check unavailable; don't block the recruiter.
+      } finally {
+        setCheckingIban(false)
+      }
     }
-    onSubmit(values)
+
+    if (valid === false) setPendingInvalidIban(values)
+    else onSubmit(values)
   })
 
   return (
@@ -225,12 +253,38 @@ export function SalesForm({ form, submitting, onSubmit }: Props) {
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="mx-auto max-w-xl">
-          <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-            {submitting ? <Spinner /> : <SendIcon />}
-            Versturen
-          </Button>
+          <div className="flex gap-2">
+            <DiscardButton onDiscard={onDiscard} disabled={submitting} />
+            <Button type="submit" size="lg" className="flex-1" disabled={submitting || checkingIban}>
+              {submitting || checkingIban ? <Spinner /> : <SendIcon />}
+              Versturen
+            </Button>
+          </div>
         </div>
       </div>
+
+      <AlertDialog open={pendingInvalidIban !== null} onOpenChange={(open) => !open && setPendingInvalidIban(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>IBAN is ongeldig</AlertDialogTitle>
+            <AlertDialogDescription>
+              De IBAN-controle heeft {pendingInvalidIban?.iban} afgekeurd. Weet je zeker dat je het formulier toch wilt
+              versturen?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>IBAN aanpassen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingInvalidIban) onSubmit(pendingInvalidIban)
+                setPendingInvalidIban(null)
+              }}
+            >
+              Toch versturen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   )
 }
@@ -393,6 +447,33 @@ function PhoneField({ control }: { control: Control<FormInput, unknown, FormValu
   )
 }
 
+function DiscardButton({ onDiscard, disabled }: { onDiscard: () => void; disabled: boolean }) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="outline" size="lg" disabled={disabled}>
+          <Trash2Icon />
+          Wissen
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Formulier wissen?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Alle ingevulde gegevens worden verwijderd en je begint met een nieuw, leeg formulier.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuleren</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={onDiscard}>
+            Wissen
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 function CheckIndicator<T>({ state, isValid }: { state: CheckState<T>; isValid: (data: T) => boolean }) {
   switch (state.status) {
     case "pending":
@@ -434,7 +515,7 @@ function AddressHint({
   if (editable) return null
   return (
     <div className="flex items-center justify-between gap-2">
-      <FieldDescription>Straat en plaats worden automatisch ingevuld.</FieldDescription>
+      <FieldDescription>Straat en plaats worden automatisch ingevuld gebaseerd op postcode en huisnummer.</FieldDescription>
       <Button type="button" variant="ghost" size="sm" onClick={onManual}>
         <PencilIcon /> Aanpassen
       </Button>
@@ -444,7 +525,7 @@ function AddressHint({
 
 function ibanDescription(state: CheckState<{ valid: boolean; bank?: string | null }>): ReactNode {
   if (state.status === "done") {
-    if (!state.data.valid) return <span className="text-destructive">IBAN ongeldig</span>
+    if (!state.data.valid) return <span className="text-amber-600">IBAN ongeldig — je kunt het formulier wel versturen</span>
     return state.data.bank ? `IBAN geldig · ${state.data.bank}` : "IBAN geldig"
   }
   if (state.status === "offline") return "Offline — IBAN wordt gecontroleerd bij versturen"

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { z } from "zod"
 import { requireUser } from "../_shared/auth.ts"
 import {
   BETAALPERIODE_OPTIONS,
@@ -22,12 +23,13 @@ Regels:
 - iban: zonder spaties, hoofdletters.
 - geslacht, contractType en betaalperiode: kies exact een van de toegestane waarden als die duidelijk is aangevinkt of vermeld.`
 
+// Every field is required so Claude always returns the complete shape; "" means "not on the form".
 const extractionSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
     klantnummer: { type: "string" },
-    geslacht: { type: "string", enum: [...GESLACHT_OPTIONS] },
+    geslacht: { type: "string", enum: [...GESLACHT_OPTIONS, ""] },
     naam: { type: "string" },
     postcode: { type: "string" },
     huisnummer: { type: "string" },
@@ -38,21 +40,63 @@ const extractionSchema = {
     telefoon: { type: "string" },
     email: { type: "string" },
     iban: { type: "string" },
-    contractType: { type: "string", enum: [...CONTRACT_TYPE_OPTIONS] },
-    betaalperiode: { type: "string", enum: [...BETAALPERIODE_OPTIONS] },
+    contractType: { type: "string", enum: [...CONTRACT_TYPE_OPTIONS, ""] },
+    betaalperiode: { type: "string", enum: [...BETAALPERIODE_OPTIONS, ""] },
     opmerkingen: { type: "string" },
   },
-  required: [],
+  required: [...EXTRACTABLE_FIELDS],
 }
 
-serve(async (req) => {
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY")
-  if (!apiKey) throw new HttpError(503, "Scannen is nog niet geconfigureerd")
+// The same contract, enforced on whatever comes back (Claude or mock) before it reaches the app.
+const extractionResult = z.object({
+  klantnummer: z.string(),
+  geslacht: z.enum([...GESLACHT_OPTIONS, ""]),
+  naam: z.string(),
+  postcode: z.string(),
+  huisnummer: z.string(),
+  toevoeging: z.string(),
+  straat: z.string(),
+  plaats: z.string(),
+  landcode: z.string(),
+  telefoon: z.string(),
+  email: z.string(),
+  iban: z.string(),
+  contractType: z.enum([...CONTRACT_TYPE_OPTIONS, ""]),
+  betaalperiode: z.enum([...BETAALPERIODE_OPTIONS, ""]),
+  opmerkingen: z.string(),
+})
 
+// Used until ANTHROPIC_API_KEY is configured, so the scan flow can be demonstrated end to end.
+const MOCK_RESULT: z.infer<typeof extractionResult> = {
+  klantnummer: "100234",
+  geslacht: "Vrouw",
+  naam: "M.A. de Vries",
+  postcode: "1012JS",
+  huisnummer: "1",
+  toevoeging: "",
+  straat: "Dam",
+  plaats: "Amsterdam",
+  landcode: "+31",
+  telefoon: "612345678",
+  email: "m.devries@voorbeeld.nl",
+  iban: "NL91ABNA0417164300",
+  contractType: "Service",
+  betaalperiode: "Maand Machtiging",
+  opmerkingen: "Graag bellen na 18:00",
+}
+const MOCK_DELAY_MS = 2500
+
+serve(async (req) => {
   const { supabase, user } = await requireUser(req)
   const { path } = await req.json()
   if (typeof path !== "string" || !path.startsWith(`${user.id}/`)) {
     throw new HttpError(400, "Ongeldig bestandspad")
+  }
+
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY")
+  if (!apiKey) {
+    await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
+    return json({ fields: toFields(extractionResult.parse(MOCK_RESULT)), mock: true })
   }
 
   const { data: file, error } = await supabase.storage.from(BUCKET).download(path)
@@ -89,14 +133,20 @@ serve(async (req) => {
   const text = response.content.find((block) => block.type === "text")
   if (!text || text.type !== "text") throw new HttpError(502, "Geen resultaat ontvangen")
 
-  const parsed = JSON.parse(text.text) as Record<string, unknown>
+  const parsed = extractionResult.safeParse(JSON.parse(text.text))
+  if (!parsed.success) throw new HttpError(502, "Onverwacht resultaat bij het uitlezen")
+  return json({ fields: toFields(parsed.data), mock: false })
+})
+
+/** Drops empty values so the app only fills fields that were actually found. */
+function toFields(result: z.infer<typeof extractionResult>): ExtractedFields {
   const fields: ExtractedFields = {}
   for (const key of EXTRACTABLE_FIELDS) {
-    const value = parsed[key]
-    if (typeof value === "string" && value.trim()) fields[key] = value.trim()
+    const value = result[key].trim()
+    if (value) fields[key] = value
   }
-  return json({ fields })
-})
+  return fields
+}
 
 function encodeBase64(bytes: Uint8Array): string {
   let binary = ""

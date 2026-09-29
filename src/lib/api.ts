@@ -44,19 +44,18 @@ export function validateIban(iban: string, signal?: AbortSignal) {
 }
 
 export function getAppConfig() {
-  return invoke<{ scanEnabled: boolean }>("app-config", {})
+  return invoke<{ scanEnabled: boolean; scanMock: boolean }>("app-config", {})
 }
 
 export function submitForm(values: FormInput) {
   return invoke<{ ok: true; rowId: string; duplicate: boolean }>("submit-form", { ...values })
 }
 
-export async function extractFromPhoto(userId: string, photo: File): Promise<ExtractedFields> {
+export async function extractFromPhoto(userId: string, photo: File): Promise<{ fields: ExtractedFields; mock: boolean }> {
   const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg"
   const path = `${userId}/${crypto.randomUUID()}.${extension}`
   const { error } = await supabase.storage.from("scans").upload(path, photo, { contentType: photo.type })
   if (error) throw new ApiError("Uploaden van de foto is mislukt", 500)
 
-  const { fields } = await invoke<{ fields: ExtractedFields }>("extract-form", { path })
-  return fields
+  return invoke<{ fields: ExtractedFields; mock: boolean }>("extract-form", { path })
 }

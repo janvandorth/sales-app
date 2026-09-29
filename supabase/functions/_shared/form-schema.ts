@@ -71,10 +71,8 @@ export const formSchema = z
       .regex(/^[1-9]\d{5,13}$/, "Alleen cijfers, zonder 0 of landcode"),
     perPost: z.boolean(),
     email: z.string().trim(),
-    iban: z
-      .string()
-      .transform(normalizeIban)
-      .refine(isValidIbanChecksum, "Ongeldig IBAN nummer"),
+    // Required, but an invalid IBAN may still be submitted; the app warns the user when online.
+    iban: z.string().transform(normalizeIban).pipe(z.string().min(1, "Vul het IBAN in")),
     contractType: z.enum(CONTRACT_TYPE_OPTIONS, { error: "Kies een contracttype" }),
     betaalperiode: z.enum(BETAALPERIODE_OPTIONS, { error: "Kies een betaaltermijn" }),
     opmerkingen: z.string().trim().max(2000),
