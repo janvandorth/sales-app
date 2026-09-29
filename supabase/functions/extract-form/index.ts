@@ -105,7 +105,12 @@ serve(async (req) => {
   const mediaType = file.type === "image/png" || file.type === "image/webp" ? file.type : "image/jpeg"
   const data = encodeBase64(new Uint8Array(await file.arrayBuffer()))
 
-  const client = new Anthropic({ apiKey })
+  // Keys that are not scoped to a workspace must name one on every request.
+  const workspaceId = Deno.env.get("ANTHROPIC_WORKSPACE_ID")
+  const client = new Anthropic({
+    apiKey,
+    defaultHeaders: workspaceId ? { "anthropic-workspace-id": workspaceId } : undefined,
+  })
   const response = await client.beta.messages.create({
     model: MODEL,
     max_tokens: 16000,

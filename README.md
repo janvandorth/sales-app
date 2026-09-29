@@ -47,7 +47,8 @@ Secrets (`supabase secrets set KEY=value --project-ref nrdpixagvynzexwzqtlf`):
 | Secret | Purpose |
 | --- | --- |
 | `ZM_API_KEY` | Zeker en Mobiel contracts API key (postcode + IBAN) |
-| `ANTHROPIC_API_KEY` | Enables the camera scan (button is greyed out without it) |
+| `ANTHROPIC_API_KEY` | Enables real camera scans (without it, scans return demo data) |
+| `ANTHROPIC_WORKSPACE_ID` | Required when the API key is not scoped to a workspace |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Service account with edit access to the sheet |
 | `GOOGLE_SHEET_ID` | Target spreadsheet ID |
 | `GOOGLE_SHEET_TAB` | Tab name (default `Sheet1`) |
