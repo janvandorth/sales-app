@@ -1,4 +1,5 @@
 import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js"
+import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import { supabase } from "@/lib/supabase"
 
@@ -58,4 +59,18 @@ export async function extractFromPhoto(userId: string, photo: File): Promise<{ f
   if (error) throw new ApiError("Uploaden van de foto is mislukt", 500)
 
   return invoke<{ fields: ExtractedFields; mock: boolean }>("extract-form", { path })
+}
+
+// --- Admin ---------------------------------------------------------------------------------------
+
+export type AdminProfileInput = { wervernaam: string; wervernr: string; isAdmin: boolean }
+
+export const adminApi = {
+  list: () => invoke<{ users: AdminUser[] }>("admin-users", { action: "list" }).then((result) => result.users),
+  invite: (email: string, profile: AdminProfileInput) =>
+    invoke("admin-users", { action: "invite", email, redirectTo: window.location.origin, ...profile }),
+  update: (id: string, profile: AdminProfileInput) => invoke("admin-users", { action: "update", id, ...profile }),
+  resendInvite: (id: string) =>
+    invoke("admin-users", { action: "resendInvite", id, redirectTo: window.location.origin }),
+  setDisabled: (id: string, disabled: boolean) => invoke("admin-users", { action: "setDisabled", id, disabled }),
 }

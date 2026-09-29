@@ -1,4 +1,4 @@
-import { CameraIcon, CloudOffIcon, LogOutIcon, RefreshCwIcon, UserIcon } from "lucide-react"
+import { CameraIcon, CloudOffIcon, LogOutIcon, RefreshCwIcon, UserIcon, UsersIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,10 +24,12 @@ type Props = {
   syncing: boolean
   onSync: () => void
   onSignOut: () => void
+  onOpenAdmin: () => void
 }
 
 export function AppHeader(props: Props) {
-  const { profile, email, online, scanEnabled, scanDisabledReason, onScan, outbox, syncing, onSync, onSignOut } = props
+  const { profile, email, online, scanEnabled, scanDisabledReason, onScan, outbox, syncing, onSync, onSignOut, onOpenAdmin } =
+    props
 
   return (
     <header className="sticky top-0 z-40 border-b bg-primary text-primary-foreground pt-[env(safe-area-inset-top)]">
@@ -78,6 +80,11 @@ export function AppHeader(props: Props) {
               </>
             )}
             <DropdownMenuSeparator />
+            {profile?.isAdmin && (
+              <DropdownMenuItem onClick={onOpenAdmin}>
+                <UsersIcon /> Beheer wervers
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onSignOut}>
               <LogOutIcon /> Uitloggen
             </DropdownMenuItem>

@@ -33,6 +33,7 @@
   },
   "include": [
     "src",
-    "supabase/functions/_shared/form-schema.ts"
+    "supabase/functions/_shared/form-schema.ts",
+    "supabase/functions/_shared/admin-types.ts"
   ]
 }

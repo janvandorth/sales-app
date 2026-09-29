@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
-export type Profile = { wervernaam: string; wervernr: string }
+export type Profile = { wervernaam: string; wervernr: string; isAdmin: boolean }
 
 const cacheKey = (userId: string) => `profile:${userId}`
 
@@ -21,14 +21,15 @@ export function useProfile(userId: string) {
   useEffect(() => {
     supabase
       .from("profiles")
-      .select("wervernaam, wervernr")
+      .select("wervernaam, wervernr, is_admin")
       .eq("id", userId)
       .single()
       .then(({ data }) => {
         if (!data) return
-        setProfile(data)
+        const next = { wervernaam: data.wervernaam, wervernr: data.wervernr, isAdmin: data.is_admin }
+        setProfile(next)
         try {
-          localStorage.setItem(cacheKey(userId), JSON.stringify(data))
+          localStorage.setItem(cacheKey(userId), JSON.stringify(next))
         } catch {
           // Storage unavailable (private mode); the in-memory value is enough.
         }

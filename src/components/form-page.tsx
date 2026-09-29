@@ -16,10 +16,26 @@ import { prepareScanImage } from "@/lib/image"
 import { clearDraft, loadDraft, saveDraft } from "@/lib/offline-store"
 import { supabase } from "@/lib/supabase"
 
-const FILL_STEP_MS = 110
+// Scan fill animation: text fields are "typed", choices are set at once.
+const TYPE_CHAR_MS = 22
+const MAX_TYPE_FIELD_MS = 450
+const CHOICE_STEP_MS = 120
+const TYPED_FIELDS = new Set<keyof FormInput>([
+  "klantnummer",
+  "naam",
+  "postcode",
+  "huisnummer",
+  "toevoeging",
+  "straat",
+  "plaats",
+  "telefoon",
+  "email",
+  "iban",
+  "opmerkingen",
+])
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-export function FormPage({ session }: { session: Session }) {
+export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdmin: () => void }) {
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
@@ -56,6 +72,7 @@ export function FormPage({ session }: { session: Session }) {
     return () => {
       clearTimeout(timer)
       subscription.unsubscribe()
+      void saveDraft(userId, form.getValues())
     }
   }, [ready, userId, form])
 
@@ -108,24 +125,35 @@ export function FormPage({ session }: { session: Session }) {
     }
   }
 
-  /** Fills extracted fields one by one from top to bottom with a short highlight. */
+  /** Types extracted values into the fields one by one, top to bottom, without scrolling. */
   async function animateFill(fields: ExtractedFields) {
     const values = normalizeExtracted(fields)
     const filled: (keyof FormInput)[] = []
     for (const name of FIELD_ORDER) {
       const value = values[name]
       if (value === undefined) continue
-      form.setValue(name, value as never, { shouldDirty: true })
       if (name === "email") form.setValue("perPost", false)
       filled.push(name)
 
-      const element = document.querySelector(`[data-field="${name}"]`)
-      element?.scrollIntoView({ block: "center", behavior: "smooth" })
-      element?.animate(
-        [{ backgroundColor: "color-mix(in oklab, var(--primary) 15%, transparent)" }, { backgroundColor: "transparent" }],
-        { duration: 800, easing: "ease-out" },
-      )
-      await sleep(FILL_STEP_MS)
+      document
+        .querySelector(`[data-field="${name}"]`)
+        ?.animate(
+          [{ backgroundColor: "color-mix(in oklab, var(--primary) 15%, transparent)" }, { backgroundColor: "transparent" }],
+          { duration: 900, easing: "ease-out" },
+        )
+
+      if (TYPED_FIELDS.has(name)) {
+        const text = String(value)
+        const perChar = Math.min(TYPE_CHAR_MS, MAX_TYPE_FIELD_MS / text.length)
+        for (let i = 1; i <= text.length; i++) {
+          form.setValue(name, text.slice(0, i) as never)
+          await sleep(perChar)
+        }
+      } else {
+        form.setValue(name, value as never)
+        await sleep(CHOICE_STEP_MS)
+      }
+      form.setValue(name, value as never, { shouldDirty: true })
     }
     await form.trigger(filled)
   }
@@ -144,6 +172,7 @@ export function FormPage({ session }: { session: Session }) {
         outbox={outbox.items}
         syncing={outbox.syncing}
         onSync={outbox.flush}
+        onOpenAdmin={onOpenAdmin}
         onSignOut={async () => {
           await clearDraft(userId)
           await supabase.auth.signOut()

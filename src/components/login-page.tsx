@@ -12,6 +12,15 @@ export function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+
+  async function handleForgotPassword() {
+    if (!email) return setError("Vul eerst je e-mailadres in")
+    setError(null)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+    if (error) setError(error.message)
+    else setResetSent(true)
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -32,6 +41,11 @@ export function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit}>
             <FieldGroup>
+              {resetSent && (
+                <Alert>
+                  <AlertDescription>Als dit adres bij ons bekend is, ontvang je een e-mail om je wachtwoord in te stellen.</AlertDescription>
+                </Alert>
+              )}
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
@@ -49,7 +63,12 @@ export function LoginPage() {
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="password">Wachtwoord</FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel htmlFor="password">Wachtwoord</FieldLabel>
+                  <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={handleForgotPassword}>
+                    Wachtwoord vergeten?
+                  </Button>
+                </div>
                 <Input
                   id="password"
                   type="password"
