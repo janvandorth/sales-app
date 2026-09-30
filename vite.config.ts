@@ -14,8 +14,8 @@ export default defineConfig({
       // Icons: white ampersand from zekerenmobiel.nl on the app's navy; generated PNGs in public/.
       includeAssets: ["favicon.png", "apple-touch-icon.png"],
       manifest: {
-        name: "Bellijst",
-        short_name: "Bellijst",
+        name: "Z&M Sales",
+        short_name: "Z&M Sales",
         description: "Sales formulier Zeker en Mobiel",
         theme_color: "#0a2e42",
         background_color: "#0a2e42",

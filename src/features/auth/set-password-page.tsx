@@ -32,7 +32,7 @@ export function SetPasswordPage({ email, isInvite, onDone }: { email: string; is
     <main className="flex min-h-svh items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">{isInvite ? "Welkom bij Bellijst" : "Nieuw wachtwoord"}</CardTitle>
+          <CardTitle className="text-xl">{isInvite ? "Welkom bij Z&M Sales" : "Nieuw wachtwoord"}</CardTitle>
           <CardDescription>Stel een wachtwoord in voor {email}</CardDescription>
         </CardHeader>
         <CardContent>

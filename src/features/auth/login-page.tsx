@@ -37,7 +37,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <img src="/logo.png" alt="Zeker & Mobiel" className="mb-2 h-7 w-auto self-start" />
-          <CardTitle className="text-xl">Bellijst</CardTitle>
+          <CardTitle className="text-xl">Z&amp;M Sales</CardTitle>
           <CardDescription>Log in met je wervers-account</CardDescription>
         </CardHeader>
         <CardContent>

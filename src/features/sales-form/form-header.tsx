@@ -48,7 +48,7 @@ export function FormHeader(props: Props) {
       }
       title={
         // Same treatment as the footer on zekerenmobiel.nl: the color logo rendered white.
-        <img src="/logo.png" alt="Zeker & Mobiel — Bellijst" className="h-6 w-auto brightness-0 invert" />
+        <img src="/logo.png" alt="Zeker & Mobiel — Z&M Sales" className="h-6 w-auto brightness-0 invert" />
       }
       end={
         <>

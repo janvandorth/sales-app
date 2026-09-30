@@ -1,4 +1,4 @@
-# Bellijst — sales app
+# Z&M Sales — sales app
 
 Mobile-first web app (installable PWA) that recruiters ("wervers") of Zeker en Mobiel use to register sales on
 the street, also offline. A sale is stored in Supabase and appended to a Google Sheet for the back office.
@@ -131,7 +131,7 @@ as-is in code so they match the Google Sheet and the back office.
 | betaaltermijn / betaalperiode  | Payment term and method (machtiging = direct debit, acceptgiro = payment slip) |
 | opmerkingen                    | Remarks (digital only, not on the paper form)                                  |
 | wachtrij / outbox              | Forms waiting to be sent (`features/outbox`)                                   |
-| Bellijst                       | Name of the app ("call list")                                                  |
+| Bellijst                       | Former name of the app ("call list"); now called Z&M Sales                     |
 
 ## Conventions
 
