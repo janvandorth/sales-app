@@ -12,8 +12,8 @@ export function createEmptyForm(): FormInput {
     started: new Date().toISOString(),
     datum: today(),
     klantnummer: "",
-    // Radio groups start unselected; the schema rejects the empty value on submit.
-    geslacht: "" as FormInput["geslacht"],
+    // Radio groups start unselected ("" is a valid input that validation rejects on submit).
+    geslacht: "",
     naam: "",
     postcode: "",
     huisnummer: "",
@@ -25,8 +25,8 @@ export function createEmptyForm(): FormInput {
     perPost: false,
     email: "",
     iban: "",
-    contractType: "" as FormInput["contractType"],
-    betaalperiode: "" as FormInput["betaalperiode"],
+    contractType: "",
+    betaalperiode: "",
     opmerkingen: "",
   }
 }

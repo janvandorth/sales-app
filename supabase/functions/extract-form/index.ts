@@ -1,75 +1,37 @@
 import Anthropic from "@anthropic-ai/sdk"
-import { z } from "zod"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { z } from "zod"
 import { requireUser } from "../_shared/auth.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import {
-  BETAALPERIODE_OPTIONS,
-  CONTRACT_TYPE_OPTIONS,
   EXTRACTABLE_FIELDS,
-  GESLACHT_OPTIONS,
+  extractionSchema,
+  normalizeIban,
   type ExtractedFields,
+  type Extraction,
 } from "../_shared/form-schema.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
+import { SCANS_BUCKET } from "../_shared/storage.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
 
 // Reading a form is a simple visual task; Sonnet at low effort keeps the scan fast.
 const MODEL = "claude-sonnet-5-5"
-const BUCKET = "scans"
 
 const SYSTEM_PROMPT = `Je leest foto's van ingevulde (vaak handgeschreven) Nederlandse verkoopformulieren van Zeker en Mobiel uit en zet de gegevens om naar gestructureerde velden.
 
 Regels:
-- Neem alleen over wat op het formulier staat. Laat een veld weg als het leeg, onleesbaar of niet aanwezig is; verzin niets.
+- Neem alleen over wat op het formulier staat. Laat een veld leeg ("") als het leeg, onleesbaar of niet aanwezig is; verzin niets.
 - naam: voorletters met punten + achternaam, bijv. "P.J. Jansen" of "A. van der Berg".
 - postcode: "1234AB" zonder spatie. huisnummer: alleen cijfers; letters of toevoegingen gaan naar toevoeging.
 - landcode: internationaal kengetal met +, bijv. "+31". telefoon: alleen cijfers zonder landcode en zonder voorloop-0 (06-12345678 wordt "612345678").
 - iban: zonder spaties, hoofdletters.
 - geslacht, contractType en betaalperiode: kies exact een van de toegestane waarden als die duidelijk is aangevinkt of vermeld.`
 
-// Every field is required so Claude always returns the complete shape; "" means "not on the form".
-const extractionSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    klantnummer: { type: "string" },
-    geslacht: { type: "string", enum: [...GESLACHT_OPTIONS, ""] },
-    naam: { type: "string" },
-    postcode: { type: "string" },
-    huisnummer: { type: "string" },
-    toevoeging: { type: "string" },
-    straat: { type: "string" },
-    plaats: { type: "string" },
-    landcode: { type: "string" },
-    telefoon: { type: "string" },
-    email: { type: "string" },
-    iban: { type: "string" },
-    contractType: { type: "string", enum: [...CONTRACT_TYPE_OPTIONS, ""] },
-    betaalperiode: { type: "string", enum: [...BETAALPERIODE_OPTIONS, ""] },
-  },
-  required: [...EXTRACTABLE_FIELDS],
-}
+// Structured output schema for Claude, derived from the shared definition (minus the $schema marker).
+const { $schema: _, ...EXTRACTION_JSON_SCHEMA } = z.toJSONSchema(extractionSchema)
 
-// The same contract, enforced on whatever comes back (Claude or mock) before it reaches the app.
-const extractionResult = z.object({
-  klantnummer: z.string(),
-  geslacht: z.enum([...GESLACHT_OPTIONS, ""]),
-  naam: z.string(),
-  postcode: z.string(),
-  huisnummer: z.string(),
-  toevoeging: z.string(),
-  straat: z.string(),
-  plaats: z.string(),
-  landcode: z.string(),
-  telefoon: z.string(),
-  email: z.string(),
-  iban: z.string(),
-  contractType: z.enum([...CONTRACT_TYPE_OPTIONS, ""]),
-  betaalperiode: z.enum([...BETAALPERIODE_OPTIONS, ""]),
-})
-
-// Used until ANTHROPIC_API_KEY is configured, so the scan flow can be demonstrated end to end.
-const MOCK_RESULT: z.infer<typeof extractionResult> = {
+// Returned when ANTHROPIC_API_KEY is not configured, so the scan flow can be demonstrated end to end.
+const MOCK_EXTRACTION: Extraction = {
   klantnummer: "100234",
   geslacht: "Vrouw",
   naam: "M.A. de Vries",
@@ -94,24 +56,21 @@ serve(async (req) => {
     throw new HttpError(400, "Ongeldig bestandspad")
   }
 
-  // The photo contains personal data (IBAN, phone, address): delete it as soon as it has been read,
-  // also when reading fails. The extracted values live on in the form, not in storage.
-  try {
-    return await extract(supabase, path)
-  } finally {
-    const { error } = await createAdminClient().storage.from(BUCKET).remove([path])
-    if (error) console.error(`Could not delete scan ${path}`, error)
-  }
+  const apiKey = optionalEnv("ANTHROPIC_API_KEY")
+  const result = apiKey
+    ? { fields: normalize(await readWithClaude(supabase, path, apiKey)), mock: false }
+    : { fields: normalize(await mockRead()), mock: true }
+
+  // The photo contains personal data (IBAN, phone, address): delete it once it has been read successfully.
+  // After a failure it is kept so the scan can be retried or investigated.
+  const { error } = await createAdminClient().storage.from(SCANS_BUCKET).remove([path])
+  if (error) console.error(`Could not delete scan ${path}`, error)
+
+  return json(result)
 })
 
-async function extract(supabase: SupabaseClient, path: string): Promise<Response> {
-  const apiKey = optionalEnv("ANTHROPIC_API_KEY")
-  if (!apiKey) {
-    await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
-    return json({ fields: toFields(extractionResult.parse(MOCK_RESULT)), mock: true })
-  }
-
-  const { data: file, error } = await supabase.storage.from(BUCKET).download(path)
+async function readWithClaude(supabase: SupabaseClient, path: string, apiKey: string): Promise<Extraction> {
+  const { data: file, error } = await supabase.storage.from(SCANS_BUCKET).download(path)
   if (error || !file) throw new HttpError(404, "Foto niet gevonden")
 
   const mediaType = file.type === "image/png" || file.type === "image/webp" ? file.type : "image/jpeg"
@@ -131,7 +90,7 @@ async function extract(supabase: SupabaseClient, path: string): Promise<Response
     fallbacks: "default",
     output_config: {
       effort: "low",
-      format: { type: "json_schema", schema: extractionSchema },
+      format: { type: "json_schema", schema: EXTRACTION_JSON_SCHEMA },
     },
     system: SYSTEM_PROMPT,
     messages: [
@@ -150,19 +109,31 @@ async function extract(supabase: SupabaseClient, path: string): Promise<Response
   const text = response.content.find((block) => block.type === "text")
   if (!text || text.type !== "text") throw new HttpError(502, "Geen resultaat ontvangen")
 
-  const parsed = extractionResult.safeParse(JSON.parse(text.text))
+  const parsed = extractionSchema.safeParse(JSON.parse(text.text))
   if (!parsed.success) throw new HttpError(502, "Onverwacht resultaat bij het uitlezen")
-  return json({ fields: toFields(parsed.data), mock: false })
+  return parsed.data
 }
 
-/** Drops empty values so the app only fills fields that were actually found. */
-function toFields(result: z.infer<typeof extractionResult>): ExtractedFields {
-  const fields: ExtractedFields = {}
+async function mockRead(): Promise<Extraction> {
+  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
+  return extractionSchema.parse(MOCK_EXTRACTION)
+}
+
+/** Cleans up what was read into the shape the form expects, and drops empty (not found) values. */
+function normalize(extraction: Extraction): ExtractedFields {
+  const cleaned: Extraction = {
+    ...extraction,
+    huisnummer: extraction.huisnummer.replace(/\D/g, ""),
+    telefoon: extraction.telefoon.replace(/\D/g, "").replace(/^0+/, ""),
+    iban: normalizeIban(extraction.iban),
+    landcode: /^\+\d{1,4}$/.test(extraction.landcode.trim()) ? extraction.landcode.trim() : "",
+  }
+  const fields: Record<string, string> = {}
   for (const key of EXTRACTABLE_FIELDS) {
-    const value = result[key].trim()
+    const value = cleaned[key].trim()
     if (value) fields[key] = value
   }
-  return fields
+  return fields as ExtractedFields
 }
 
 function encodeBase64(bytes: Uint8Array): string {

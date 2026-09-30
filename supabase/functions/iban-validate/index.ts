@@ -1,13 +1,13 @@
+import { z } from "zod"
 import { requireUser } from "../_shared/auth.ts"
 import { isValidIbanChecksum, normalizeIban } from "../_shared/form-schema.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { zmGet } from "../_shared/zekerenmobiel.ts"
 
-type ValidateResponse = {
-  valid: boolean
-  iban: string
-  bankData: { bankCode: string; name: string; bic: string } | null
-}
+const validateResponse = z.object({
+  valid: z.boolean(),
+  bankData: z.object({ name: z.string(), bic: z.string() }).nullable(),
+})
 
 serve(async (req) => {
   await requireUser(req)
@@ -18,7 +18,7 @@ serve(async (req) => {
   // The upstream API accepts anything that is not a Dutch IBAN, so check the checksum ourselves first.
   if (!isValidIbanChecksum(normalized)) return json({ valid: false, iban: normalized })
 
-  const result = await zmGet<ValidateResponse>("/IBAN/Validate", { iban: normalized })
+  const result = await zmGet("/IBAN/Validate", { iban: normalized }, validateResponse)
   return json({
     valid: result.valid,
     iban: normalized,

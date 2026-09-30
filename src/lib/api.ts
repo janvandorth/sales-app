@@ -6,6 +6,7 @@ import {
 } from "@supabase/supabase-js"
 import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
+import { SCANS_BUCKET } from "@shared/storage"
 import { supabase } from "@/lib/supabase"
 
 /** Thrown when the request never reached the server (offline, DNS, timeout). Safe to retry later. */
@@ -75,7 +76,7 @@ export function submitForm(values: FormInput) {
 export async function extractFromPhoto(userId: string, photo: File): Promise<{ fields: ExtractedFields; mock: boolean }> {
   const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg"
   const path = `${userId}/${crypto.randomUUID()}.${extension}`
-  const { error } = await supabase.storage.from("scans").upload(path, photo, { contentType: photo.type })
+  const { error } = await supabase.storage.from(SCANS_BUCKET).upload(path, photo, { contentType: photo.type })
   if (error) throw new ApiError("Uploaden van de foto is mislukt", 500)
 
   return invoke<{ fields: ExtractedFields; mock: boolean }>("extract-form", { path })

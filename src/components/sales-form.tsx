@@ -294,24 +294,6 @@ export function SalesForm({ form, submitting, onSubmit, onDiscard }: Props) {
   )
 }
 
-/** Form fields in top-to-bottom order; used for the scan fill animation. */
-export const FIELD_ORDER = [
-  "klantnummer",
-  "geslacht",
-  "naam",
-  "postcode",
-  "huisnummer",
-  "toevoeging",
-  "straat",
-  "plaats",
-  "landcode",
-  "telefoon",
-  "email",
-  "iban",
-  "contractType",
-  "betaalperiode",
-] as const satisfies readonly FieldPath<FormInput>[]
-
 type StringField = {
   [K in FieldPath<FormInput>]: FormInput[K] extends string ? K : never
 }[FieldPath<FormInput>]

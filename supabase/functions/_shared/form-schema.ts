@@ -40,13 +40,27 @@ export function isValidIbanChecksum(value: string): boolean {
   return remainder === 1
 }
 
+/**
+ * Radio groups start as "" (nothing picked). "" is accepted as input so empty forms type-check, but it is
+ * rejected by validation, and the validated output type no longer contains it.
+ */
+function requireChoice(message: string) {
+  return <V extends string>(value: V, ctx: z.RefinementCtx): Exclude<V, ""> => {
+    if (value === "") {
+      ctx.addIssue({ code: "custom", message })
+      return z.NEVER
+    }
+    return value as Exclude<V, ""> // TypeScript cannot narrow a generic by comparison.
+  }
+}
+
 export const formSchema = z
   .object({
     rowId: z.uuid(),
     started: z.iso.datetime(),
     datum: z.iso.date({ error: "Kies een datum" }),
     klantnummer: z.string().trim().min(1, "Vul het klantnummer in"),
-    geslacht: z.enum(GESLACHT_OPTIONS, { error: "Kies man of vrouw" }),
+    geslacht: z.enum([...GESLACHT_OPTIONS, ""], { error: "Kies man of vrouw" }).transform(requireChoice("Kies man of vrouw")),
     naam: z
       .string()
       .trim()
@@ -73,8 +87,8 @@ export const formSchema = z
     email: z.string().trim(),
     // Required, but an invalid IBAN may still be submitted; the app warns the user when online.
     iban: z.string().transform(normalizeIban).pipe(z.string().min(1, "Vul het IBAN in")),
-    contractType: z.enum(CONTRACT_TYPE_OPTIONS, { error: "Kies een contracttype" }),
-    betaalperiode: z.enum(BETAALPERIODE_OPTIONS, { error: "Kies een betaaltermijn" }),
+    contractType: z.enum([...CONTRACT_TYPE_OPTIONS, ""], { error: "Kies een contracttype" }).transform(requireChoice("Kies een contracttype")),
+    betaalperiode: z.enum([...BETAALPERIODE_OPTIONS, ""], { error: "Kies een betaaltermijn" }).transform(requireChoice("Kies een betaaltermijn")),
     opmerkingen: z.string().trim().max(2000),
   })
   .superRefine((values, ctx) => {
@@ -87,25 +101,38 @@ export const formSchema = z
 export type FormInput = z.input<typeof formSchema>
 export type FormValues = z.output<typeof formSchema>
 
-/** Fields Claude may extract from a photographed paper form. Opmerkingen is digital-only, so never extracted. */
-export const EXTRACTABLE_FIELDS = [
-  "klantnummer",
-  "geslacht",
-  "naam",
-  "postcode",
-  "huisnummer",
-  "toevoeging",
-  "straat",
-  "plaats",
-  "landcode",
-  "telefoon",
-  "email",
-  "iban",
-  "contractType",
-  "betaalperiode",
-] as const satisfies readonly (keyof FormInput)[]
+/**
+ * What Claude reads from a photographed paper form. This is the single definition: the JSON schema sent to
+ * Claude, the validation of its answer and the order of the fill animation are all derived from it.
+ * Keys are in form order. Every key is always present; "" means "not on the paper form".
+ * Opmerkingen is digital-only, so it is not part of the paper form.
+ */
+export const extractionSchema = z.strictObject({
+  klantnummer: z.string(),
+  geslacht: z.enum([...GESLACHT_OPTIONS, ""]),
+  naam: z.string(),
+  postcode: z.string(),
+  huisnummer: z.string(),
+  toevoeging: z.string(),
+  straat: z.string(),
+  plaats: z.string(),
+  landcode: z.string(),
+  telefoon: z.string(),
+  email: z.string(),
+  iban: z.string(),
+  contractType: z.enum([...CONTRACT_TYPE_OPTIONS, ""]),
+  betaalperiode: z.enum([...BETAALPERIODE_OPTIONS, ""]),
+})
 
-export type ExtractedFields = Partial<Record<(typeof EXTRACTABLE_FIELDS)[number], string>>
+export type Extraction = z.infer<typeof extractionSchema>
+
+/** Extractable form fields, in form order. */
+export const EXTRACTABLE_FIELDS = extractionSchema.keyof().options satisfies readonly (keyof FormInput)[]
+
+export type ExtractableField = (typeof EXTRACTABLE_FIELDS)[number]
+
+/** Extraction result as sent to the app: only the fields that were found, already normalized. */
+export type ExtractedFields = { [K in ExtractableField]?: Exclude<Extraction[K], ""> }
 
 /** One row in the Google Sheet, keyed by the sheet's column headers. */
 export type SheetRow = {

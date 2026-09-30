@@ -1,9 +1,15 @@
+import { z } from "zod"
 import { requireUser } from "../_shared/auth.ts"
+import { toTitleCase } from "../_shared/format.ts"
 import { POSTCODE_REGEX, normalizePostcode } from "../_shared/form-schema.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { zmGet } from "../_shared/zekerenmobiel.ts"
 
-type LookupResponse = { hasError: boolean; street: string | null; residence: string | null }
+const lookupResponse = z.object({
+  hasError: z.boolean(),
+  street: z.string().nullable(),
+  residence: z.string().nullable(),
+})
 
 serve(async (req) => {
   await requireUser(req)
@@ -16,21 +22,12 @@ serve(async (req) => {
     throw new HttpError(400, "Ongeldig huisnummer")
   }
 
-  const result = await zmGet<LookupResponse>("/PostalCode/Lookup", {
-    postalCode: normalizePostcode(postcode),
-    houseNr: huisnummer.trim(),
-  })
+  const result = await zmGet(
+    "/PostalCode/Lookup",
+    { postalCode: normalizePostcode(postcode), houseNr: huisnummer.trim() },
+    lookupResponse,
+  )
 
-  if (result.hasError || !result.street || !result.residence) {
-    return json({ found: false })
-  }
+  if (result.hasError || !result.street || !result.residence) return json({ found: false })
   return json({ found: true, straat: result.street, plaats: toTitleCase(result.residence) })
 })
-
-/** "DEN HAAG" -> "Den Haag", "'S-GRAVENHAGE" -> "'s-Gravenhage" */
-function toTitleCase(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/(^|[\s-])(\p{L})/gu, (_, sep: string, letter: string) => sep + letter.toUpperCase())
-    .replace(/^'S-/i, "'s-")
-}

@@ -3,10 +3,17 @@ import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import type { Session } from "@supabase/supabase-js"
-import { formSchema, normalizeIban, type ExtractedFields, type FormInput, type FormValues } from "@shared/form-schema"
+import {
+  EXTRACTABLE_FIELDS,
+  formSchema,
+  type ExtractableField,
+  type ExtractedFields,
+  type FormInput,
+  type FormValues,
+} from "@shared/form-schema"
 import { AppHeader } from "@/components/app-header"
 import { OutboxDialog } from "@/components/outbox-dialog"
-import { FIELD_ORDER, SalesForm } from "@/components/sales-form"
+import { SalesForm } from "@/components/sales-form"
 import { Spinner } from "@/components/ui/spinner"
 import { useOnline } from "@/hooks/use-online"
 import { useOutbox } from "@/hooks/use-outbox"
@@ -17,22 +24,11 @@ import { prepareScanImage } from "@/lib/image"
 import { clearDraft, loadDraft, saveDraft, type QueuedSubmission } from "@/lib/offline-store"
 import { supabase } from "@/lib/supabase"
 
-// Scan fill animation: text fields are "typed", choices are set at once.
+// Scan fill animation: text fields are "typed" character by character, pickers are set at once.
 const TYPE_CHAR_MS = 22
 const MAX_TYPE_FIELD_MS = 450
 const CHOICE_STEP_MS = 120
-const TYPED_FIELDS = new Set<keyof FormInput>([
-  "klantnummer",
-  "naam",
-  "postcode",
-  "huisnummer",
-  "toevoeging",
-  "straat",
-  "plaats",
-  "telefoon",
-  "email",
-  "iban",
-])
+const PICKER_FIELDS = new Set<ExtractableField>(["geslacht", "landcode", "contractType", "betaalperiode"])
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdmin: () => void }) {
@@ -129,10 +125,9 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
 
   /** Types extracted values into the fields one by one, top to bottom, without scrolling. */
   async function animateFill(fields: ExtractedFields) {
-    const values = normalizeExtracted(fields)
-    const filled: (keyof FormInput)[] = []
-    for (const name of FIELD_ORDER) {
-      const value = values[name]
+    const filled: ExtractableField[] = []
+    for (const name of EXTRACTABLE_FIELDS) {
+      const value = fields[name]
       if (value === undefined) continue
       if (name === "email") form.setValue("perPost", false)
       filled.push(name)
@@ -144,20 +139,27 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
           { duration: 900, easing: "ease-out" },
         )
 
-      if (TYPED_FIELDS.has(name)) {
-        const text = String(value)
-        const perChar = Math.min(TYPE_CHAR_MS, MAX_TYPE_FIELD_MS / text.length)
-        for (let i = 1; i <= text.length; i++) {
-          form.setValue(name, text.slice(0, i) as never)
+      if (PICKER_FIELDS.has(name)) {
+        setField(name, value)
+        await sleep(CHOICE_STEP_MS)
+      } else {
+        const perChar = Math.min(TYPE_CHAR_MS, MAX_TYPE_FIELD_MS / value.length)
+        for (let i = 1; i <= value.length; i++) {
+          setField(name, value.slice(0, i))
           await sleep(perChar)
         }
-      } else {
-        form.setValue(name, value as never)
-        await sleep(CHOICE_STEP_MS)
       }
-      form.setValue(name, value as never, { shouldDirty: true })
+      setField(name, value)
     }
     await form.trigger(filled)
+  }
+
+  /**
+   * Sets one extracted field. The loop above iterates over a union of field names, which TypeScript cannot
+   * correlate with the matching value type; values are validated against the same schema on the server.
+   */
+  function setField(name: ExtractableField, value: string) {
+    form.setValue(name, value as FormInput[typeof name], { shouldDirty: true })
   }
 
   const scanDisabledReason = online ? null : "Scannen werkt alleen online"
@@ -228,13 +230,4 @@ export function FormPage({ session, onOpenAdmin }: { session: Session; onOpenAdm
       )}
     </div>
   )
-}
-
-function normalizeExtracted(fields: ExtractedFields): Partial<FormInput> {
-  const values: Partial<FormInput> = { ...fields } as Partial<FormInput>
-  if (fields.telefoon) values.telefoon = fields.telefoon.replace(/\D/g, "").replace(/^0+/, "")
-  if (fields.landcode && !/^\+\d{1,4}$/.test(fields.landcode)) delete values.landcode
-  if (fields.iban) values.iban = normalizeIban(fields.iban)
-  if (fields.huisnummer) values.huisnummer = fields.huisnummer.replace(/\D/g, "")
-  return values
 }
