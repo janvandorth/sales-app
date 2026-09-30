@@ -1,11 +1,11 @@
 import { useState } from "react"
-import { AdminPage } from "@/components/admin-page"
-import { FormPage } from "@/components/form-page"
-import { LoginPage } from "@/components/login-page"
-import { SetPasswordPage } from "@/components/set-password-page"
 import { Toaster } from "@/components/ui/sonner"
 import { Spinner } from "@/components/ui/spinner"
-import { useSession } from "@/hooks/use-session"
+import { AdminPage } from "@/features/admin/admin-page"
+import { LoginPage } from "@/features/auth/login-page"
+import { SetPasswordPage } from "@/features/auth/set-password-page"
+import { useSession } from "@/features/auth/use-session"
+import { FormPage } from "@/features/sales-form/form-page"
 
 export default function App() {
   const { session, loading, needsPassword, isInvite, passwordSet } = useSession()

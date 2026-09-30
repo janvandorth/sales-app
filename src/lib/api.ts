@@ -1,3 +1,4 @@
+// Every call from the app to the backend (Supabase edge functions and storage) goes through this file.
 import {
   FunctionsFetchError,
   FunctionsHttpError,
@@ -7,23 +8,8 @@ import {
 import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import { SCANS_BUCKET } from "@shared/storage"
+import { ApiError, AuthError, NetworkError } from "@/lib/errors"
 import { supabase } from "@/lib/supabase"
-
-/** Thrown when the request never reached the server (offline, DNS, timeout). Safe to retry later. */
-export class NetworkError extends Error {}
-
-/** Thrown when the server answered with an error. Retrying the same request will not help. */
-export class ApiError extends Error {
-  readonly status: number
-
-  constructor(message: string, status: number) {
-    super(message)
-    this.status = status
-  }
-}
-
-/** Thrown when the session is no longer valid (e.g. revoked). The user has been signed out on this device. */
-export class AuthError extends Error {}
 
 async function invoke<T>(name: string, body: Record<string, unknown>, signal?: AbortSignal, isRetry = false): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>(name, { body, signal })
@@ -57,6 +43,8 @@ async function recoverSession(): Promise<void> {
   throw new AuthError("Je sessie is verlopen, log opnieuw in")
 }
 
+// --- Sales form ----------------------------------------------------------------------------------
+
 export type PostcodeResult = { found: true; straat: string; plaats: string } | { found: false }
 
 export function lookupPostcode(postcode: string, huisnummer: string, signal?: AbortSignal) {
@@ -73,6 +61,7 @@ export function submitForm(values: FormInput) {
   return invoke<{ ok: true; rowId: string; duplicate: boolean }>("submit-form", { ...values })
 }
 
+/** Uploads a scan photo and has it read; the backend deletes the photo after a successful read. */
 export async function extractFromPhoto(userId: string, photo: File): Promise<{ fields: ExtractedFields; mock: boolean }> {
   const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg"
   const path = `${userId}/${crypto.randomUUID()}.${extension}`

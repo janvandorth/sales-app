@@ -27,6 +27,8 @@ export default defineConfig({
       },
     }),
   ],
+  // PORT lets tooling (e.g. a preview runner) pick a free port; 5173 is Vite's default.
+  server: { port: Number(process.env.PORT) || 5173 },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

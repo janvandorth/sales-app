@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useOnline } from "@/hooks/use-online"
 
 export type CheckState<T> =
@@ -20,13 +20,18 @@ export function useDebouncedCheck<T>(
 ): CheckState<T> {
   const online = useOnline()
   const [result, setResult] = useState<{ key: string; state: CheckState<T> } | null>(null)
+  // Callers pass inline functions; keep the latest one without making it a trigger for a new check.
+  const checkRef = useRef(check)
+  useEffect(() => {
+    checkRef.current = check
+  })
 
   useEffect(() => {
     if (key === null || !online) return
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       try {
-        const data = await check(key, controller.signal)
+        const data = await checkRef.current(key, controller.signal)
         if (!controller.signal.aborted) setResult({ key, state: { status: "done", data } })
       } catch (error) {
         if (controller.signal.aborted) return
@@ -38,8 +43,6 @@ export function useDebouncedCheck<T>(
       clearTimeout(timer)
       controller.abort()
     }
-    // `check` is intentionally excluded: callers pass inline functions and only `key` should retrigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, online, delay])
 
   if (key === null) return { status: "idle" }

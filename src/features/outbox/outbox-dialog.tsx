@@ -11,16 +11,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
-import type { QueuedSubmission } from "@/lib/offline-store"
+import type { OutboxItem } from "./outbox-store"
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  items: QueuedSubmission[]
+  items: OutboxItem[]
   online: boolean
   syncing: boolean
   onSync: () => void
-  onEdit: (item: QueuedSubmission) => void
+  onEdit: (item: OutboxItem) => void
   onDelete: (rowId: string) => void
 }
 
@@ -47,9 +47,9 @@ export function OutboxDialog({ open, onOpenChange, items, online, syncing, onSyn
                   Klantnr. {item.values.klantnummer || "—"} · opgeslagen {formatTime(item.queuedAt)}
                 </p>
               </div>
-              {item.lastError && (
+              {item.rejectedReason && (
                 <Alert variant="destructive" className="py-2">
-                  <AlertDescription>Geweigerd: {item.lastError}. Pas het formulier aan en verstuur opnieuw.</AlertDescription>
+                  <AlertDescription>Geweigerd: {item.rejectedReason}. Pas het formulier aan en verstuur opnieuw.</AlertDescription>
                 </Alert>
               )}
               <div className="flex gap-2">

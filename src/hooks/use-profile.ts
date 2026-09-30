@@ -1,40 +1,41 @@
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
 
 export type Profile = { wervernaam: string; wervernr: string; isAdmin: boolean }
 
 const cacheKey = (userId: string) => `profile:${userId}`
 
-function readCache(userId: string): Profile | null {
+function readCachedProfile(userId: string): Profile | undefined {
   try {
     const raw = localStorage.getItem(cacheKey(userId))
-    return raw ? (JSON.parse(raw) as Profile) : null
+    return raw ? (JSON.parse(raw) as Profile) : undefined
   } catch {
-    return null
+    return undefined // Storage unavailable (private mode) or corrupt; the network result will follow.
   }
 }
 
-/** The recruiter profile, cached in localStorage so it is available offline. */
-export function useProfile(userId: string) {
-  const [profile, setProfile] = useState<Profile | null>(() => readCache(userId))
-
-  useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("wervernaam, wervernr, is_admin")
-      .eq("id", userId)
-      .single()
-      .then(({ data }) => {
-        if (!data) return
-        const next = { wervernaam: data.wervernaam, wervernr: data.wervernr, isAdmin: data.is_admin }
-        setProfile(next)
-        try {
-          localStorage.setItem(cacheKey(userId), JSON.stringify(next))
-        } catch {
-          // Storage unavailable (private mode); the in-memory value is enough.
-        }
-      })
-  }, [userId])
-
+async function fetchProfile(userId: string): Promise<Profile> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("wervernaam, wervernr, is_admin")
+    .eq("id", userId)
+    .single()
+  if (error) throw error
+  const profile = { wervernaam: data.wervernaam, wervernr: data.wervernr, isAdmin: data.is_admin }
+  try {
+    localStorage.setItem(cacheKey(userId), JSON.stringify(profile))
+  } catch {
+    // Storage unavailable; the in-memory query cache is enough.
+  }
   return profile
+}
+
+/** The recruiter's own profile. The last known value is kept in localStorage so it is available offline. */
+export function useProfile(userId: string): Profile | undefined {
+  const { data } = useQuery({
+    queryKey: ["profile", userId],
+    queryFn: () => fetchProfile(userId),
+    placeholderData: () => readCachedProfile(userId),
+  })
+  return data
 }

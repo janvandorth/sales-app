@@ -1,20 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { FormInput } from "@shared/form-schema"
 import { useOnline } from "@/hooks/use-online"
-import { AuthError, NetworkError, submitForm } from "@/lib/api"
-import { enqueue, loadOutbox, markOutboxError, removeFromOutbox, type QueuedSubmission } from "@/lib/offline-store"
+import { submitForm } from "@/lib/api"
+import { getErrorMessage, isRetryable } from "@/lib/errors"
+import { addToOutbox, loadOutbox, markOutboxItemRejected, removeFromOutbox } from "./outbox-store"
 
 const RETRY_INTERVAL_MS = 30_000
 
-/** Forms submitted while offline are queued in IndexedDB and sent automatically once back online. */
+const outboxQueryKey = (userId: string) => ["outbox", userId] as const
+
+/**
+ * Submits forms, queueing them in IndexedDB when they cannot be sent right now (offline, session expired).
+ * Queued forms are sent automatically when the app starts, comes back online, and every 30 s.
+ */
 export function useOutbox(userId: string) {
   const online = useOnline()
-  const [items, setItems] = useState<QueuedSubmission[]>([])
+  const queryClient = useQueryClient()
+  // IndexedDB is local, so this query must also run while offline ("always").
+  const { data: items = [] } = useQuery({
+    queryKey: outboxQueryKey(userId),
+    queryFn: () => loadOutbox(userId),
+    networkMode: "always",
+  })
   const [syncing, setSyncing] = useState(false)
   const flushing = useRef(false)
 
-  const refresh = useCallback(async () => setItems(await loadOutbox(userId)), [userId])
+  const refresh = useCallback(() => queryClient.invalidateQueries({ queryKey: outboxQueryKey(userId) }), [queryClient, userId])
 
   const flush = useCallback(async () => {
     if (flushing.current || !navigator.onLine) return
@@ -29,9 +42,8 @@ export function useOutbox(userId: string) {
           sent++
         } catch (error) {
           // Not the form's fault: keep it queued and try again later (after reconnecting or logging in again).
-          if (error instanceof NetworkError || error instanceof AuthError) break
-          const message = error instanceof Error ? error.message : "Versturen mislukt"
-          await markOutboxError(userId, item.values.rowId, message)
+          if (isRetryable(error)) break
+          await markOutboxItemRejected(userId, item.values.rowId, getErrorMessage(error, "Versturen mislukt"))
         }
       }
     } finally {
@@ -42,10 +54,7 @@ export function useOutbox(userId: string) {
     if (sent > 0) toast.success(sent === 1 ? "1 formulier uit de wachtrij verstuurd" : `${sent} formulieren uit de wachtrij verstuurd`)
   }, [userId, refresh])
 
-  useEffect(() => {
-    void refresh().then(flush)
-  }, [refresh, flush])
-
+  // Send what is queued on start and whenever the connection comes back.
   useEffect(() => {
     if (online) void flush()
   }, [online, flush])
@@ -56,7 +65,7 @@ export function useOutbox(userId: string) {
     return () => clearInterval(timer)
   }, [items.length, flush])
 
-  /** Sends now when possible; queues when offline. Throws ApiError for server-side rejections. */
+  /** Sends now when possible, otherwise queues. Throws for server-side rejections (e.g. validation). */
   const submit = useCallback(
     async (values: FormInput): Promise<"sent" | "queued"> => {
       if (navigator.onLine) {
@@ -64,10 +73,10 @@ export function useOutbox(userId: string) {
           await submitForm(values)
           return "sent"
         } catch (error) {
-          if (!(error instanceof NetworkError || error instanceof AuthError)) throw error
+          if (!isRetryable(error)) throw error
         }
       }
-      await enqueue(userId, values)
+      await addToOutbox(userId, values)
       await refresh()
       return "queued"
     },
