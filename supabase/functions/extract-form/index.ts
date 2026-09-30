@@ -86,7 +86,6 @@ async function readWithClaude(supabase: SupabaseClient, path: string, apiKey: st
     model: MODEL,
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
-    // @ts-expect-error `fallbacks: "default"` is newer than some SDK typings.
     fallbacks: "default",
     output_config: {
       effort: "low",

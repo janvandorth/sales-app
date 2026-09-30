@@ -1,8 +1,9 @@
-import { createClient, type User } from "@supabase/supabase-js"
+import type { User } from "@supabase/supabase-js"
 import { z } from "zod"
 import type { AdminUser } from "../_shared/admin-types.ts"
 import { requireUser } from "../_shared/auth.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
+import { createAdminClient } from "../_shared/supabase.ts"
 
 const profileFields = {
   wervernaam: z.string().trim().min(1, "Vul de wervernaam in").max(100),
@@ -23,9 +24,10 @@ const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("setDisabled"), id: z.uuid(), disabled: z.boolean() }),
 ])
 
-const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-  auth: { persistSession: false },
-})
+/** Supabase blocks a user "forever" by banning for 100 years. */
+const BAN_FOREVER = "876000h"
+
+const admin = createAdminClient()
 
 serve(async (req) => {
   const { user: caller } = await requireUser(req)
@@ -45,22 +47,18 @@ serve(async (req) => {
         data: { wervernaam: body.wervernaam, wervernr: body.wervernr },
         redirectTo: body.redirectTo,
       })
-      if (error) {
-        const exists = error.message.toLowerCase().includes("already")
-        throw new HttpError(exists ? 409 : 400, exists ? "Er bestaat al een gebruiker met dit e-mailadres" : error.message)
-      }
+      if (error?.code === "email_exists") throw new HttpError(409, "Er bestaat al een gebruiker met dit e-mailadres")
+      if (error) throw new HttpError(400, error.message)
       // The on_auth_user_created trigger created the profile from the metadata; only the admin flag is left.
-      if (body.isAdmin) await admin.from("profiles").update({ is_admin: true }).eq("id", data.user.id)
+      if (body.isAdmin) {
+        await updateProfile(caller.id, data.user.id, { wervernaam: body.wervernaam, wervernr: body.wervernr, isAdmin: true })
+      }
       return json({ ok: true })
     }
 
     case "update": {
       if (body.id === caller.id && !body.isAdmin) throw new HttpError(400, "Je kunt je eigen beheerrechten niet intrekken")
-      const { error } = await admin
-        .from("profiles")
-        .update({ wervernaam: body.wervernaam, wervernr: body.wervernr, is_admin: body.isAdmin })
-        .eq("id", body.id)
-      if (error) throw error
+      await updateProfile(caller.id, body.id, body)
       return json({ ok: true })
     }
 
@@ -79,7 +77,7 @@ serve(async (req) => {
     case "setDisabled": {
       if (body.id === caller.id) throw new HttpError(400, "Je kunt jezelf niet blokkeren")
       const { error } = await admin.auth.admin.updateUserById(body.id, {
-        ban_duration: body.disabled ? "876000h" : "none",
+        ban_duration: body.disabled ? BAN_FOREVER : "none",
       })
       if (error) throw new HttpError(400, error.message)
       return json({ ok: true })
@@ -96,16 +94,17 @@ async function listUsers(): Promise<AdminUser[]> {
     if (data.users.length < 1000) break
   }
 
-  const [{ data: profiles, error: profilesError }, { data: submissions, error: submissionsError }] = await Promise.all([
+  const [{ data: profiles, error: profilesError }, { data: counts, error: countsError }] = await Promise.all([
     admin.from("profiles").select("id, wervernaam, wervernr, is_admin"),
-    admin.from("submissions").select("user_id"),
+    admin.rpc("submission_counts"),
   ])
   if (profilesError) throw profilesError
-  if (submissionsError) throw submissionsError
+  if (countsError) throw countsError
 
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
-  const submissionCount = new Map<string, number>()
-  for (const { user_id } of submissions) submissionCount.set(user_id, (submissionCount.get(user_id) ?? 0) + 1)
+  const submissionCount = new Map<string, number>(
+    (counts as { user_id: string; submissions: number }[]).map((row) => [row.user_id, Number(row.submissions)]),
+  )
 
   return users
     .map((user): AdminUser => {
@@ -124,4 +123,21 @@ async function listUsers(): Promise<AdminUser[]> {
       }
     })
     .sort((a, b) => a.wervernaam.localeCompare(b.wervernaam, "nl"))
+}
+
+/** Updates a profile through the database function that records the acting admin in the audit log. */
+async function updateProfile(
+  actorId: string,
+  profileId: string,
+  profile: { wervernaam: string; wervernr: string; isAdmin: boolean },
+) {
+  const { error } = await admin.rpc("update_profile_as_admin", {
+    p_actor: actorId,
+    p_profile_id: profileId,
+    p_wervernaam: profile.wervernaam,
+    p_wervernr: profile.wervernr,
+    p_is_admin: profile.isAdmin,
+  })
+  if (error?.code === "23505") throw new HttpError(409, "Dit wervernummer is al in gebruik")
+  if (error) throw error
 }

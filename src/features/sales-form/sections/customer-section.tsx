@@ -15,7 +15,7 @@ export function CustomerSection({ control }: { control: SalesFormControl }) {
         name="naam"
         label="Voorletter(s) + naam"
         placeholder="P.J. Jansen"
-        description="Voorletters met punten, gevolgd door de achternaam"
+        description="Voorletters in hoofdletters met punten, achternaam met een hoofdletter. Bijv. P.J. Jansen of A. van der Berg"
         autoCapitalize="words"
       />
     </FormSection>

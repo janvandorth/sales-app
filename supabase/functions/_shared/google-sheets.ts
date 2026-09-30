@@ -1,3 +1,4 @@
+import { optionalEnv, requireEnv } from "./env.ts"
 import { SHEET_COLUMNS, type SheetRow } from "./form-schema.ts"
 
 // Rows are appended through an Apps Script web app bound to the sheet (see supabase/google-sheets-webhook.gs).
@@ -5,18 +6,18 @@ import { SHEET_COLUMNS, type SheetRow } from "./form-schema.ts"
 
 /** True when the sheet webhook is configured. */
 export function isSheetsConfigured(): boolean {
-  return Boolean(Deno.env.get("SHEETS_WEBHOOK_URL") && Deno.env.get("SHEETS_WEBHOOK_SECRET"))
+  return Boolean(optionalEnv("SHEETS_WEBHOOK_URL") && optionalEnv("SHEETS_WEBHOOK_SECRET"))
 }
 
 /** Appends one row to the sheet, in SHEET_COLUMNS order. */
 export async function appendSheetRow(row: SheetRow): Promise<void> {
   // Apps Script answers POSTs with a redirect to the result; fetch follows it (as a GET), which is intended.
-  const response = await fetch(Deno.env.get("SHEETS_WEBHOOK_URL")!, {
+  const response = await fetch(requireEnv("SHEETS_WEBHOOK_URL"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      secret: Deno.env.get("SHEETS_WEBHOOK_SECRET"),
-      tab: Deno.env.get("SHEETS_TAB") ?? "",
+      secret: requireEnv("SHEETS_WEBHOOK_SECRET"),
+      tab: optionalEnv("SHEETS_TAB") ?? "",
       row: SHEET_COLUMNS.map((column) => row[column]),
     }),
     signal: AbortSignal.timeout(15_000),

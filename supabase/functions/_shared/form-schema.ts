@@ -65,7 +65,7 @@ export const formSchema = z
       .string()
       .trim()
       .min(1, "Vul de naam in")
-      .regex(NAAM_REGEX, "Gebruik voorletters + achternaam, bijv. P.J. Jansen"),
+      .regex(NAAM_REGEX, "Voorletters als hoofdletter met punt, achternaam met hoofdletter, bijv. P.J. Jansen"),
     postcode: z
       .string()
       .trim()
