@@ -11,16 +11,21 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
+      // Icons: white ampersand from zekerenmobiel.nl on the app's navy; generated PNGs in public/.
+      includeAssets: ["favicon.png", "apple-touch-icon.png"],
       manifest: {
         name: "Bellijst",
         short_name: "Bellijst",
         description: "Sales formulier Zeker en Mobiel",
         theme_color: "#0a2e42",
-        background_color: "#ffffff",
+        background_color: "#0a2e42",
         display: "standalone",
         start_url: "/",
-        icons: [{ src: "favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
+        icons: [
+          { src: "pwa-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "pwa-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "pwa-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
       },
       workbox: {
         navigateFallback: "/index.html",
