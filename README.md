@@ -48,8 +48,8 @@ Secrets (`supabase secrets set KEY=value --project-ref nrdpixagvynzexwzqtlf`):
 | `ZM_API_KEY` | Zeker en Mobiel contracts API key (postcode + IBAN) |
 | `ANTHROPIC_API_KEY` | Enables real camera scans (without it, scans return demo data) |
 | `ANTHROPIC_WORKSPACE_ID` | Required when the API key is not scoped to a workspace |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Service account with edit access to the sheet |
-| `GOOGLE_SHEET_ID` | Target spreadsheet ID |
-| `GOOGLE_SHEET_TAB` | Tab name (default `Sheet1`) |
+| `SHEETS_WEBHOOK_URL` | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`) |
+| `SHEETS_WEBHOOK_SECRET` | Shared secret; must equal `SECRET` in the Apps Script |
+| `SHEETS_TAB` | Optional tab name (default: first tab) |
 
 Rows that could not be written to the sheet have `sheet_synced_at is null` in `submissions`.
