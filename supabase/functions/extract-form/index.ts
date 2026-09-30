@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { z } from "zod"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireUser } from "../_shared/auth.ts"
+import { optionalEnv } from "../_shared/env.ts"
 import {
   BETAALPERIODE_OPTIONS,
   CONTRACT_TYPE_OPTIONS,
@@ -9,6 +11,7 @@ import {
   type ExtractedFields,
 } from "../_shared/form-schema.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
+import { createAdminClient } from "../_shared/supabase.ts"
 
 // Reading a form is a simple visual task; Sonnet at low effort keeps the scan fast.
 const MODEL = "claude-sonnet-5-5"
@@ -91,7 +94,18 @@ serve(async (req) => {
     throw new HttpError(400, "Ongeldig bestandspad")
   }
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY")
+  // The photo contains personal data (IBAN, phone, address): delete it as soon as it has been read,
+  // also when reading fails. The extracted values live on in the form, not in storage.
+  try {
+    return await extract(supabase, path)
+  } finally {
+    const { error } = await createAdminClient().storage.from(BUCKET).remove([path])
+    if (error) console.error(`Could not delete scan ${path}`, error)
+  }
+})
+
+async function extract(supabase: SupabaseClient, path: string): Promise<Response> {
+  const apiKey = optionalEnv("ANTHROPIC_API_KEY")
   if (!apiKey) {
     await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
     return json({ fields: toFields(extractionResult.parse(MOCK_RESULT)), mock: true })
@@ -104,7 +118,7 @@ serve(async (req) => {
   const data = encodeBase64(new Uint8Array(await file.arrayBuffer()))
 
   // Keys that are not scoped to a workspace must name one on every request.
-  const workspaceId = Deno.env.get("ANTHROPIC_WORKSPACE_ID")
+  const workspaceId = optionalEnv("ANTHROPIC_WORKSPACE_ID")
   const client = new Anthropic({
     apiKey,
     defaultHeaders: workspaceId ? { "anthropic-workspace-id": workspaceId } : undefined,
@@ -139,7 +153,7 @@ serve(async (req) => {
   const parsed = extractionResult.safeParse(JSON.parse(text.text))
   if (!parsed.success) throw new HttpError(502, "Onverwacht resultaat bij het uitlezen")
   return json({ fields: toFields(parsed.data), mock: false })
-})
+}
 
 /** Drops empty values so the app only fills fields that were actually found. */
 function toFields(result: z.infer<typeof extractionResult>): ExtractedFields {
