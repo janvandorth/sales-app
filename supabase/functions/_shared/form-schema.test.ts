@@ -83,3 +83,9 @@ describe("IBAN helpers", () => {
     expect(normalizePostcode(" 1012 js")).toBe("1012JS")
   })
 })
+
+describe("formSchema error reporting", () => {
+  it("reports an invalid email together with the other errors", () => {
+    expect(issuesFor({ klantnummer: "", email: "" })).toEqual(expect.arrayContaining(["klantnummer", "email"]))
+  })
+})

@@ -93,11 +93,11 @@ export const formSchema = z
       .transform(requireChoice("Kies een betaaltermijn")),
     opmerkingen: z.string().trim().max(2000),
   })
-  .superRefine((values, ctx) => {
-    if (values.perPost) return
-    if (!z.email().safeParse(values.email).success) {
-      ctx.addIssue({ code: "custom", path: ["email"], message: "Ongeldig e-mailadres" })
-    }
+  .refine((values) => values.perPost || z.email().safeParse(values.email).success, {
+    path: ["email"],
+    message: "Ongeldig e-mailadres",
+    // Also check while other fields are still invalid, so every error shows at once.
+    when: ({ value }) => typeof value === "object" && value !== null && "perPost" in value && "email" in value,
   })
 
 export type FormInput = z.input<typeof formSchema>
