@@ -60,17 +60,15 @@ export const formSchema = z
     started: z.iso.datetime(),
     datum: z.iso.date({ error: "Kies een datum" }),
     klantnummer: z.string().trim().min(1, "Vul het klantnummer in"),
-    geslacht: z.enum([...GESLACHT_OPTIONS, ""], { error: "Kies man of vrouw" }).transform(requireChoice("Kies man of vrouw")),
+    geslacht: z
+      .enum([...GESLACHT_OPTIONS, ""], { error: "Kies man of vrouw" })
+      .transform(requireChoice("Kies man of vrouw")),
     naam: z
       .string()
       .trim()
       .min(1, "Vul de naam in")
       .regex(NAAM_REGEX, "Voorletters als hoofdletter met punt, achternaam met hoofdletter, bijv. P.J. Jansen"),
-    postcode: z
-      .string()
-      .trim()
-      .regex(POSTCODE_REGEX, "Ongeldige postcode, bijv. 1234 AB")
-      .transform(normalizePostcode),
+    postcode: z.string().trim().regex(POSTCODE_REGEX, "Ongeldige postcode, bijv. 1234 AB").transform(normalizePostcode),
     huisnummer: z
       .string()
       .trim()
@@ -87,8 +85,12 @@ export const formSchema = z
     email: z.string().trim(),
     // Required, but an invalid IBAN may still be submitted; the app warns the user when online.
     iban: z.string().transform(normalizeIban).pipe(z.string().min(1, "Vul het IBAN in")),
-    contractType: z.enum([...CONTRACT_TYPE_OPTIONS, ""], { error: "Kies een contracttype" }).transform(requireChoice("Kies een contracttype")),
-    betaalperiode: z.enum([...BETAALPERIODE_OPTIONS, ""], { error: "Kies een betaaltermijn" }).transform(requireChoice("Kies een betaaltermijn")),
+    contractType: z
+      .enum([...CONTRACT_TYPE_OPTIONS, ""], { error: "Kies een contracttype" })
+      .transform(requireChoice("Kies een contracttype")),
+    betaalperiode: z
+      .enum([...BETAALPERIODE_OPTIONS, ""], { error: "Kies een betaaltermijn" })
+      .transform(requireChoice("Kies een betaaltermijn")),
     opmerkingen: z.string().trim().max(2000),
   })
   .superRefine((values, ctx) => {

@@ -27,7 +27,10 @@ export function useOutbox(userId: string) {
   const [syncing, setSyncing] = useState(false)
   const flushing = useRef(false)
 
-  const refresh = useCallback(() => queryClient.invalidateQueries({ queryKey: outboxQueryKey(userId) }), [queryClient, userId])
+  const refresh = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: outboxQueryKey(userId) }),
+    [queryClient, userId],
+  )
 
   const flush = useCallback(async () => {
     if (flushing.current || !navigator.onLine) return
@@ -51,7 +54,10 @@ export function useOutbox(userId: string) {
       setSyncing(false)
       await refresh()
     }
-    if (sent > 0) toast.success(sent === 1 ? "1 formulier uit de wachtrij verstuurd" : `${sent} formulieren uit de wachtrij verstuurd`)
+    if (sent > 0)
+      toast.success(
+        sent === 1 ? "1 formulier uit de wachtrij verstuurd" : `${sent} formulieren uit de wachtrij verstuurd`,
+      )
   }, [userId, refresh])
 
   // Send what is queued on start and whenever the connection comes back.

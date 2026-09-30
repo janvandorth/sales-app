@@ -58,7 +58,13 @@ export function FormHeader(props: Props) {
             </Badge>
           )}
           {outbox.length > 0 && (
-            <Button variant="ghost" size="sm" className={HEADER_BUTTON_CLASS} onClick={onOpenOutbox} aria-label="Wachtrij bekijken">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={HEADER_BUTTON_CLASS}
+              onClick={onOpenOutbox}
+              aria-label="Wachtrij bekijken"
+            >
               <RefreshCwIcon className={cn(syncing && "animate-spin")} />
               {outbox.length}
             </Button>
@@ -72,7 +78,9 @@ export function FormHeader(props: Props) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="flex flex-col">
                 <span>{profile?.wervernaam ?? email}</span>
-                {profile && <span className="text-xs font-normal text-muted-foreground">Wervernr. {profile.wervernr}</span>}
+                {profile && (
+                  <span className="text-xs font-normal text-muted-foreground">Wervernr. {profile.wervernr}</span>
+                )}
               </DropdownMenuLabel>
               {outbox.length > 0 && (
                 <>

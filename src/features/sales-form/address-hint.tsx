@@ -24,7 +24,9 @@ export function AddressHint({ lookup }: { lookup: ReturnType<typeof useAddressLo
   if (editable) return null
   return (
     <div className="flex items-center justify-between gap-2">
-      <FieldDescription>Straat en plaats worden automatisch ingevuld gebaseerd op postcode en huisnummer.</FieldDescription>
+      <FieldDescription>
+        Straat en plaats worden automatisch ingevuld gebaseerd op postcode en huisnummer.
+      </FieldDescription>
       <Button type="button" variant="ghost" size="sm" onClick={enableManual}>
         <PencilIcon /> Aanpassen
       </Button>

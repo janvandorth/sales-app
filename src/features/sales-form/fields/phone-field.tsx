@@ -17,7 +17,12 @@ export function PhoneField({ control }: { control: SalesFormControl }) {
           name="landcode"
           render={({ field, fieldState }) => (
             <div data-field="landcode" className="rounded-md">
-              <CountryCodePicker id="landcode" value={field.value} onChange={field.onChange} invalid={fieldState.invalid} />
+              <CountryCodePicker
+                id="landcode"
+                value={field.value}
+                onChange={field.onChange}
+                invalid={fieldState.invalid}
+              />
             </div>
           )}
         />

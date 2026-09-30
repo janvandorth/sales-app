@@ -11,7 +11,12 @@ import { SCANS_BUCKET } from "@shared/storage"
 import { ApiError, AuthError, NetworkError } from "@/lib/errors"
 import { supabase } from "@/lib/supabase"
 
-async function invoke<T>(name: string, body: Record<string, unknown>, signal?: AbortSignal, isRetry = false): Promise<T> {
+async function invoke<T>(
+  name: string,
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+  isRetry = false,
+): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>(name, { body, signal })
   if (!error) return data as T
 
@@ -62,7 +67,10 @@ export function submitForm(values: FormInput) {
 }
 
 /** Uploads a scan photo and has it read; the backend deletes the photo after a successful read. */
-export async function extractFromPhoto(userId: string, photo: File): Promise<{ fields: ExtractedFields; mock: boolean }> {
+export async function extractFromPhoto(
+  userId: string,
+  photo: File,
+): Promise<{ fields: ExtractedFields; mock: boolean }> {
   const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg"
   const path = `${userId}/${crypto.randomUUID()}.${extension}`
   const { error } = await supabase.storage.from(SCANS_BUCKET).upload(path, photo, { contentType: photo.type })

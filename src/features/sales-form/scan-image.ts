@@ -11,7 +11,11 @@ export async function prepareScanImage(file: File): Promise<File> {
   bitmap.close()
 
   const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((result) => (result ? resolve(result) : reject(new Error("Foto verwerken mislukt"))), "image/jpeg", 0.85),
+    canvas.toBlob(
+      (result) => (result ? resolve(result) : reject(new Error("Foto verwerken mislukt"))),
+      "image/jpeg",
+      0.85,
+    ),
   )
   return new File([blob], "scan.jpg", { type: "image/jpeg" })
 }

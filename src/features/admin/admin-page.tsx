@@ -1,6 +1,15 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { ArrowLeftIcon, BanIcon, MailIcon, MoreVerticalIcon, PencilIcon, RefreshCwIcon, ShieldCheckIcon, UserPlusIcon } from "lucide-react"
+import {
+  ArrowLeftIcon,
+  BanIcon,
+  MailIcon,
+  MoreVerticalIcon,
+  PencilIcon,
+  RefreshCwIcon,
+  ShieldCheckIcon,
+  UserPlusIcon,
+} from "lucide-react"
 import type { AdminUser } from "@shared/admin-types"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -28,7 +37,13 @@ export function AdminPage({ currentUserId, onBack }: Props) {
       <PageHeader
         maxWidth="3xl"
         start={
-          <Button variant="ghost" size="icon" className={HEADER_BUTTON_CLASS} aria-label="Terug naar formulier" onClick={onBack}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={HEADER_BUTTON_CLASS}
+            aria-label="Terug naar formulier"
+            onClick={onBack}
+          >
             <ArrowLeftIcon />
           </Button>
         }

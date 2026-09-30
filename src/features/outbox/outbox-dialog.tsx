@@ -49,7 +49,9 @@ export function OutboxDialog({ open, onOpenChange, items, online, syncing, onSyn
               </div>
               {item.rejectedReason && (
                 <Alert variant="destructive" className="py-2">
-                  <AlertDescription>Geweigerd: {item.rejectedReason}. Pas het formulier aan en verstuur opnieuw.</AlertDescription>
+                  <AlertDescription>
+                    Geweigerd: {item.rejectedReason}. Pas het formulier aan en verstuur opnieuw.
+                  </AlertDescription>
                 </Alert>
               )}
               <div className="flex gap-2">
@@ -93,7 +95,10 @@ export function OutboxDialog({ open, onOpenChange, items, online, syncing, onSyn
 }
 
 function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(
-    new Date(iso),
-  )
+  return new Intl.DateTimeFormat("nl-NL", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso))
 }

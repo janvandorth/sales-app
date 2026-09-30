@@ -51,13 +51,18 @@ serve(async (req) => {
       if (error) throw new HttpError(400, error.message)
       // The on_auth_user_created trigger created the profile from the metadata; only the admin flag is left.
       if (body.isAdmin) {
-        await updateProfile(caller.id, data.user.id, { wervernaam: body.wervernaam, wervernr: body.wervernr, isAdmin: true })
+        await updateProfile(caller.id, data.user.id, {
+          wervernaam: body.wervernaam,
+          wervernr: body.wervernr,
+          isAdmin: true,
+        })
       }
       return json({ ok: true })
     }
 
     case "update": {
-      if (body.id === caller.id && !body.isAdmin) throw new HttpError(400, "Je kunt je eigen beheerrechten niet intrekken")
+      if (body.id === caller.id && !body.isAdmin)
+        throw new HttpError(400, "Je kunt je eigen beheerrechten niet intrekken")
       await updateProfile(caller.id, body.id, body)
       return json({ ok: true })
     }

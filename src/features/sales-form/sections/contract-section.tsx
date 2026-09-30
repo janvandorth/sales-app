@@ -34,7 +34,13 @@ export function ContractSection({ form, iban }: Props) {
         iban={iban.normalized}
         onPick={(code) => setValue("iban", `${iban.normalized.slice(0, 4)} ${code} `, { shouldDirty: true })}
       />
-      <ChoiceField control={control} name="contractType" label="Contracttype" options={CONTRACT_TYPE_OPTIONS} columns={2} />
+      <ChoiceField
+        control={control}
+        name="contractType"
+        label="Contracttype"
+        options={CONTRACT_TYPE_OPTIONS}
+        columns={2}
+      />
       <ChoiceField control={control} name="betaalperiode" label="Betaaltermijn" options={BETAALPERIODE_OPTIONS} />
       <Controller
         control={control}
@@ -55,7 +61,8 @@ export function ContractSection({ form, iban }: Props) {
 
 function describeIbanCheck(state: CheckState<IbanResult>): ReactNode {
   if (state.status === "done") {
-    if (!state.data.valid) return <span className="text-amber-600">IBAN ongeldig — je kunt het formulier wel versturen</span>
+    if (!state.data.valid)
+      return <span className="text-amber-600">IBAN ongeldig — je kunt het formulier wel versturen</span>
     return state.data.bank ? `IBAN geldig · ${state.data.bank}` : "IBAN geldig"
   }
   if (state.status === "offline") return "Offline — IBAN wordt gecontroleerd bij versturen"

@@ -18,8 +18,8 @@ export function InvalidIbanDialog({ iban }: { iban: ReturnType<typeof useIbanChe
         <AlertDialogHeader>
           <AlertDialogTitle>IBAN is ongeldig</AlertDialogTitle>
           <AlertDialogDescription>
-            De IBAN-controle heeft {iban.awaitingConfirmation?.iban} afgekeurd. Weet je zeker dat je het formulier
-            toch wilt versturen?
+            De IBAN-controle heeft {iban.awaitingConfirmation?.iban} afgekeurd. Weet je zeker dat je het formulier toch
+            wilt versturen?
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

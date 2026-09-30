@@ -43,13 +43,13 @@ supabase functions deploy --use-api --project-ref nrdpixagvynzexwzqtlf
 
 Secrets (`supabase secrets set KEY=value --project-ref nrdpixagvynzexwzqtlf`):
 
-| Secret | Purpose |
-| --- | --- |
-| `ZM_API_KEY` | Zeker en Mobiel contracts API key (postcode + IBAN) |
-| `ANTHROPIC_API_KEY` | Enables real camera scans (without it, scans return demo data) |
-| `ANTHROPIC_WORKSPACE_ID` | Required when the API key is not scoped to a workspace |
-| `SHEETS_WEBHOOK_URL` | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`) |
-| `SHEETS_WEBHOOK_SECRET` | Shared secret; must equal `SECRET` in the Apps Script |
-| `SHEETS_TAB` | Optional tab name (default: first tab) |
+| Secret                   | Purpose                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                   |
+| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                        |
+| `ANTHROPIC_WORKSPACE_ID` | Required when the API key is not scoped to a workspace                                |
+| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`) |
+| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                 |
+| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                |
 
 Rows that could not be written to the sheet have `sheet_synced_at is null` in `submissions`.

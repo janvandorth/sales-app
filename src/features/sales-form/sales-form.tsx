@@ -24,7 +24,11 @@ export function SalesForm({ form, submitting, onSubmit, onDiscard }: Props) {
   const busy = submitting || iban.checkingOnSubmit
 
   return (
-    <form onSubmit={form.handleSubmit(iban.guardSubmit)} noValidate className="mx-auto flex max-w-xl flex-col gap-4 p-4 pb-24">
+    <form
+      onSubmit={form.handleSubmit(iban.guardSubmit)}
+      noValidate
+      className="mx-auto flex max-w-xl flex-col gap-4 p-4 pb-24"
+    >
       <CustomerSection control={form.control} />
       <AddressSection form={form} />
       <ContactSection form={form} />

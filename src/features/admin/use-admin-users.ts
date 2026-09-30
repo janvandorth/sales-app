@@ -14,7 +14,10 @@ export function useAdminUsers() {
  * A change to a recruiter (invite, edit, block, …): shows a toast and reloads the list afterwards.
  * Errors are shown as a toast unless the caller handles them (e.g. inside a dialog).
  */
-export function useAdminAction<TArgs>(action: (args: TArgs) => Promise<unknown>, options: { toastErrors?: boolean } = {}) {
+export function useAdminAction<TArgs>(
+  action: (args: TArgs) => Promise<unknown>,
+  options: { toastErrors?: boolean } = {},
+) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: action,

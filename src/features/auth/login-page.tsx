@@ -27,7 +27,8 @@ export function LoginPage() {
     setSubmitting(true)
     setError(null)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError(error.message === "Invalid login credentials" ? "Onjuist e-mailadres of wachtwoord" : error.message)
+    if (error)
+      setError(error.message === "Invalid login credentials" ? "Onjuist e-mailadres of wachtwoord" : error.message)
     setSubmitting(false)
   }
 
@@ -44,7 +45,9 @@ export function LoginPage() {
             <FieldGroup>
               {resetSent && (
                 <Alert>
-                  <AlertDescription>Als dit adres bij ons bekend is, ontvang je een e-mail om je wachtwoord in te stellen.</AlertDescription>
+                  <AlertDescription>
+                    Als dit adres bij ons bekend is, ontvang je een e-mail om je wachtwoord in te stellen.
+                  </AlertDescription>
                 </Alert>
               )}
               {error && (
