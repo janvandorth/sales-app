@@ -4,19 +4,24 @@
 const SECRET = "<same value as SHEETS_WEBHOOK_SECRET>"
 
 function doPost(e) {
-  const body = JSON.parse(e.postData.contents)
-  if (body.secret !== SECRET) return reply({ ok: false, error: "unauthorized" })
-
-  const lock = LockService.getScriptLock()
-  lock.waitLock(10000) // concurrent sales must not write to the same row
   try {
-    const sheet = SpreadsheetApp.getActive().getSheetByName(body.tab) || SpreadsheetApp.getActive().getSheets()[0]
-    const range = sheet.getRange(sheet.getLastRow() + 1, 1, 1, body.row.length)
-    range.setNumberFormat("@").setValues([body.row]) // store as text so "+316…" is not parsed as a number
-  } finally {
-    lock.releaseLock()
+    const body = JSON.parse(e.postData.contents)
+    if (body.secret !== SECRET) return reply({ ok: false, error: "unauthorized" })
+
+    const lock = LockService.getScriptLock()
+    lock.waitLock(10000) // concurrent sales must not write to the same row
+    try {
+      const sheet = SpreadsheetApp.getActive().getSheetByName(body.tab) || SpreadsheetApp.getActive().getSheets()[0]
+      const range = sheet.getRange(sheet.getLastRow() + 1, 1, 1, body.row.length)
+      range.setNumberFormat("@").setValues([body.row]) // store as text so "+316…" is not parsed as a number
+    } finally {
+      lock.releaseLock()
+    }
+    return reply({ ok: true })
+  } catch (error) {
+    // Report the cause (e.g. missing edit access) to the caller; it ends up in the Supabase function logs.
+    return reply({ ok: false, error: String(error) })
   }
-  return reply({ ok: true })
 }
 
 function reply(data) {

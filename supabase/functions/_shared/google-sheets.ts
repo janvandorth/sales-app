@@ -22,9 +22,29 @@ export async function appendSheetRow(row: SheetRow): Promise<void> {
     }),
     signal: AbortSignal.timeout(15_000),
   })
-  // Apps Script always answers 200; the outcome is in the body.
-  const result = await response.json().catch(() => null)
+  // Apps Script answers 200 with {ok, error} from our script, or an HTML error page when the script itself
+  // fails (e.g. the deploying account lost access to the sheet). Keep the readable part for the logs.
+  const body = await response.text()
+  const result = parseJson(body)
   if (!response.ok || result?.ok !== true) {
-    throw new Error(`Sheet append failed: ${response.status} ${JSON.stringify(result)}`)
+    const detail = result?.error ?? htmlToText(body).slice(0, 500)
+    throw new Error(`Sheet append failed (HTTP ${response.status}): ${detail}`)
   }
+}
+
+function parseJson(text: string): { ok?: boolean; error?: string } | null {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
 }
