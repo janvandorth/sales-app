@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { formSchema, SHEET_COLUMNS, type FormInput } from "./form-schema"
-import { toSheetPhone, toSheetRow, toSubmissionRecord } from "./submission-record"
+import { toSheetRow, toSubmissionRecord } from "./submission-record"
 
 const values = formSchema.parse({
   rowId: "0b5a1a6e-8a2f-4f3c-9d7e-2d1f4c3b2a10",
@@ -62,7 +62,7 @@ describe("toSheetRow", () => {
       "A",
       "Dam",
       "Amsterdam",
-      "612345678",
+      "+31612345678",
       "pj@voorbeeld.nl",
       "NL91ABNA0417164300",
       "Z",
@@ -70,12 +70,4 @@ describe("toSheetRow", () => {
       "Graag bellen",
     ])
   })
-})
-
-describe("toSheetPhone", () => {
-  it.each([
-    ["+31612345678", "612345678"],
-    ["+4917620113187", "4917620113187"],
-    ["+32470123456", "32470123456"],
-  ])("%s -> %s", (input, expected) => expect(toSheetPhone(input)).toBe(expected))
 })

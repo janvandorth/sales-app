@@ -77,14 +77,10 @@ const BETAALPERIODE_CODES: Record<string, string> = {
 /** Location is not recorded by this app; the previous app wrote GPS coordinates or "Unknown". */
 const UNKNOWN_LOCATION = "Unknown"
 
-/** "+31612345678" -> "612345678" (Dutch numbers without country code); others keep the code without "+". */
-export function toSheetPhone(phone: string): string {
-  return phone.startsWith("+31") ? phone.slice(3) : phone.replace(/^\+/, "")
-}
-
 /**
  * The Google Sheet row for a stored submission, in the format of the existing rows of the previous app:
  * short codes, Dutch dates without seconds, Completed = submit time, CompletedBy = the recruiter.
+ * The phone number is sent in full international form (+31…).
  */
 export function toSheetRow(record: SubmissionRecord): SheetRow {
   const received = formatDutchDateTime(new Date(record.received))
@@ -106,7 +102,7 @@ export function toSheetRow(record: SubmissionRecord): SheetRow {
     Toevoeging: record.toevoeging,
     Straat: record.straat,
     Plaats: record.plaats,
-    Telefoon: toSheetPhone(record.telefoon),
+    Telefoon: record.telefoon, // full international number, e.g. "+31612345678"
     Email: record.email,
     IBAN: record.iban,
     ContractType: CONTRACT_TYPE_CODES[record.contract_type] ?? record.contract_type,
