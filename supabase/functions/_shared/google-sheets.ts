@@ -30,9 +30,14 @@ export async function appendSheetRow(row: SheetRow): Promise<void> {
     const detail = result?.error ?? htmlToText(body).slice(0, 500)
     throw new Error(`Sheet append failed (HTTP ${response.status}): ${detail}`)
   }
+  // Newer versions of the Apps Script report where the row went.
+  if (result.tab)
+    console.log(`Sheet row ${row.RowId} written to "${result.spreadsheet}" / ${result.tab} row ${result.row}`)
 }
 
-function parseJson(text: string): { ok?: boolean; error?: string } | null {
+type WebhookResult = { ok?: boolean; error?: string; spreadsheet?: string; tab?: string; row?: number }
+
+function parseJson(text: string): WebhookResult | null {
   try {
     return JSON.parse(text)
   } catch {
