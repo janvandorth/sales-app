@@ -63,31 +63,54 @@ export function toSubmissionRecord(
   }
 }
 
-/** The Google Sheet row for a stored submission. Back-office columns (Completed…) start empty. */
+// The back-office sheet is shared with the previous app and uses its short codes; Supabase keeps full labels.
+const GESLACHT_CODES: Record<string, string> = { Man: "M", Vrouw: "V" }
+const CONTRACT_TYPE_CODES: Record<string, string> = { Service: "S", Zakelijk: "Z" }
+const BETAALPERIODE_CODES: Record<string, string> = {
+  "Maand Machtiging": "MM",
+  "Jaar Machtiging": "JM",
+  "Kwartaal Machtiging": "KM",
+  "Jaar Acceptgiro": "JA",
+  "Zakelijk Acceptgiro": "ZA",
+}
+
+/** Location is not recorded by this app; the previous app wrote GPS coordinates or "Unknown". */
+const UNKNOWN_LOCATION = "Unknown"
+
+/** "+31612345678" -> "612345678" (Dutch numbers without country code); others keep the code without "+". */
+export function toSheetPhone(phone: string): string {
+  return phone.startsWith("+31") ? phone.slice(3) : phone.replace(/^\+/, "")
+}
+
+/**
+ * The Google Sheet row for a stored submission, in the format of the existing rows of the previous app:
+ * short codes, Dutch dates without seconds, Completed = submit time, CompletedBy = the recruiter.
+ */
 export function toSheetRow(record: SubmissionRecord): SheetRow {
+  const received = formatDutchDateTime(new Date(record.received))
   return {
     RowId: record.row_id,
-    Completed: "",
-    CompletedBy: "",
+    Completed: received,
+    CompletedBy: record.wervernaam,
     Started: formatDutchDateTime(new Date(record.started)),
-    Received: formatDutchDateTime(new Date(record.received)),
-    CompletedAt: "",
+    Received: received,
+    CompletedAt: UNKNOWN_LOCATION,
     Datum: formatDutchDate(record.datum),
     Wervernaam: record.wervernaam,
     Wervernr: record.wervernr,
     Klantnummer: record.klantnummer,
-    Geslacht: record.geslacht,
+    Geslacht: GESLACHT_CODES[record.geslacht] ?? record.geslacht,
     Naam: record.naam,
     Postcode: record.postcode,
     Huisnummer: record.huisnummer,
     Toevoeging: record.toevoeging,
     Straat: record.straat,
     Plaats: record.plaats,
-    Telefoon: record.telefoon,
+    Telefoon: toSheetPhone(record.telefoon),
     Email: record.email,
     IBAN: record.iban,
-    ContractType: record.contract_type,
-    Betaalperiode: record.betaalperiode,
+    ContractType: CONTRACT_TYPE_CODES[record.contract_type] ?? record.contract_type,
+    Betaalperiode: BETAALPERIODE_CODES[record.betaalperiode] ?? record.betaalperiode,
     Opmerkingen: record.opmerkingen,
   }
 }

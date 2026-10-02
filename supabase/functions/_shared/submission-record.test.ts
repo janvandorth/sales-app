@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { formSchema, SHEET_COLUMNS, type FormInput } from "./form-schema"
-import { toSheetRow, toSubmissionRecord } from "./submission-record"
+import { toSheetPhone, toSheetRow, toSubmissionRecord } from "./submission-record"
 
 const values = formSchema.parse({
   rowId: "0b5a1a6e-8a2f-4f3c-9d7e-2d1f4c3b2a10",
@@ -41,33 +41,41 @@ describe("toSubmissionRecord", () => {
 })
 
 describe("toSheetRow", () => {
-  it("fills every sheet column, in the sheet's order", () => {
+  it("fills every sheet column, in the sheet's order and the previous app's format", () => {
     const row = toSheetRow(toSubmissionRecord(values, "user-a", recruiter, received))
     expect(Object.keys(row).sort()).toEqual([...SHEET_COLUMNS].sort())
     expect(SHEET_COLUMNS.map((column) => row[column])).toEqual([
       values.rowId,
-      "",
-      "",
-      "30-09-2026 10:00:00",
-      "30-09-2026 10:10:00",
-      "",
+      "30-09-2026 10:10",
+      "Anna",
+      "30-09-2026 10:00",
+      "30-09-2026 10:10",
+      "Unknown",
       "30-09-2026",
       "Anna",
       "W0001",
       "100234",
-      "Man",
+      "M",
       "P.J. Jansen",
       "1012JS",
       "1",
       "A",
       "Dam",
       "Amsterdam",
-      "+31612345678",
+      "612345678",
       "pj@voorbeeld.nl",
       "NL91ABNA0417164300",
-      "Zakelijk",
-      "Jaar Acceptgiro",
+      "Z",
+      "JA",
       "Graag bellen",
     ])
   })
+})
+
+describe("toSheetPhone", () => {
+  it.each([
+    ["+31612345678", "612345678"],
+    ["+4917620113187", "4917620113187"],
+    ["+32470123456", "32470123456"],
+  ])("%s -> %s", (input, expected) => expect(toSheetPhone(input)).toBe(expected))
 })

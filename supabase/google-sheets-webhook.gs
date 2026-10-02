@@ -12,7 +12,9 @@ function doPost(e) {
     lock.waitLock(10000) // concurrent sales must not write to the same row
     try {
       const sheet = SpreadsheetApp.getActive().getSheetByName(body.tab) || SpreadsheetApp.getActive().getSheets()[0]
-      const range = sheet.getRange(sheet.getLastRow() + 1, 1, 1, body.row.length)
+      // Last filled row in column A (RowId); getLastRow() would also count checkboxes or formulas further down.
+      const lastRow = sheet.getRange(sheet.getMaxRows(), 1).getNextDataCell(SpreadsheetApp.Direction.UP).getRow()
+      const range = sheet.getRange(lastRow + 1, 1, 1, body.row.length)
       range.setNumberFormat("@").setValues([body.row]) // store as text so "+316…" is not parsed as a number
     } finally {
       lock.releaseLock()

@@ -8,7 +8,7 @@ export function toTitleCase(value: string): string {
     .replace(/^'S-/i, "'s-")
 }
 
-/** "29-09-2026 14:05:31" in Dutch local time. */
+/** "29-09-2026 14:05" in Dutch local time (the format of the back-office sheet). */
 export function formatDutchDateTime(date: Date): string {
   return new Intl.DateTimeFormat("nl-NL", {
     timeZone: "Europe/Amsterdam",
@@ -17,7 +17,6 @@ export function formatDutchDateTime(date: Date): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
   })
     .format(date)
     .replace(",", "")
