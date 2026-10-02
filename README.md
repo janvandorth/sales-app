@@ -37,7 +37,7 @@ npm run dev
      │               then read ─────────▶ extract-form ─────────────────────────────▶ Claude
      ├─ submit (or queue when offline) ─▶ submit-form ──▶ submissions table
      │                                         └───────────────────────────────────▶ Google Sheet (Apps Script)
-     │                                    sync-sheet (scheduled) retries rows not in the sheet yet
+     │                                    sync-sheet (hourly, pg_cron) appends rows not in the sheet yet
      └─ admin page (admins only) ───────▶ admin-users ──▶ auth admin API, profiles, profile_changes
 ```
 
@@ -163,16 +163,16 @@ as-is in code so they match the Google Sheet and the back office.
 Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 `supabase secrets set NAME=value --project-ref nrdpixagvynzexwzqtlf`.
 
-| Secret                   | Purpose                                                                               |
-| ------------------------ | ------------------------------------------------------------------------------------- |
-| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                   |
-| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                        |
-| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                             |
-| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`) |
-| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                 |
-| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                |
-| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)         |
-| `CRON_SECRET`            | Shared secret for the scheduled `sync-sheet` call                                     |
+| Secret                   | Purpose                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                                 |
+| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                                      |
+| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                                           |
+| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`)               |
+| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                               |
+| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                              |
+| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)                       |
+| `CRON_SECRET`            | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret` |
 
 ### Recruiters
 
