@@ -111,7 +111,14 @@ export function FormPage({ session, onOpenAdmin }: Props) {
       />
 
       {ready ? (
-        <SalesForm key={rowId} form={form} submitting={submitting} onSubmit={handleSubmit} onDiscard={handleDiscard} />
+        <SalesForm
+          key={rowId}
+          form={form}
+          submitting={submitting}
+          naamCorrection={scanFill.naamCorrection}
+          onSubmit={handleSubmit}
+          onDiscard={handleDiscard}
+        />
       ) : (
         <div className="flex justify-center p-12">
           <Spinner className="size-6" />

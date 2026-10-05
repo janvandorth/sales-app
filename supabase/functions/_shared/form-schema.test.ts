@@ -35,12 +35,12 @@ describe("formSchema", () => {
     expect(result.iban).toBe("NL91ABNA0417164300")
   })
 
-  it.each(["P.J. Jansen", "Th. van der Berg", "A. de Vries-Bakker", "J. Özdemir", "P.J.Jansen"])(
-    "accepts the name %s",
-    (naam) => expect(issuesFor({ naam })).toEqual([]),
+  it.each(["P.J. Jansen", "Th. van der Berg", "IJ. de Boer", "J.-P. Dupont", "M. Di Maio", "p.j. jansen", "Jansen"])(
+    "accepts the name %s as typed",
+    (naam) => expect(formSchema.parse({ ...validForm, naam }).naam).toBe(naam),
   )
 
-  it.each(["Jansen", "P Jansen", "p.j. jansen", "P.J. jansen", "PJ. Jansen", ""])("rejects the name %j", (naam) => {
+  it.each(["", "   "])("rejects the empty name %j", (naam) => {
     expect(issuesFor({ naam })).toContain("naam")
   })
 

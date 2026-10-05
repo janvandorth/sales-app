@@ -15,10 +15,6 @@ export const BETAALPERIODE_OPTIONS = [
 
 export const PER_POST_EMAIL = "Per post"
 
-// Initials followed by a surname, e.g. "P.J. Jansen", "Th. van der Berg", "A. de Vries-Bakker".
-const NAAM_REGEX =
-  /^(?:\p{Lu}\p{Ll}?\.){1,6}\s*(?:(?:van|de|der|den|het|ten|ter|te|in|'t|la|le|du|da|di|von|el|al|op)\s+)*\p{Lu}[\p{L}'’-]*(?:[\s-]\p{L}[\p{L}'’-]*)*$/u
-
 export const POSTCODE_REGEX = /^[1-9]\d{3}\s?[A-Za-z]{2}$/
 
 export function normalizePostcode(value: string): string {
@@ -63,11 +59,8 @@ export const formSchema = z
     geslacht: z
       .enum([...GESLACHT_OPTIONS, ""], { error: "Kies man of vrouw" })
       .transform(requireChoice("Kies man of vrouw")),
-    naam: z
-      .string()
-      .trim()
-      .min(1, "Vul de naam in")
-      .regex(NAAM_REGEX, "Voorletters als hoofdletter met punt, achternaam met hoofdletter, bijv. P.J. Jansen"),
+    // Free-form: no rule fits every name worldwide. The app suggests capitals and initials, but never enforces them.
+    naam: z.string().trim().min(1, "Vul de naam in").max(200, "Maximaal 200 tekens"),
     postcode: z.string().trim().regex(POSTCODE_REGEX, "Ongeldige postcode, bijv. 1234 AB").transform(normalizePostcode),
     huisnummer: z
       .string()

@@ -5,6 +5,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { DiscardButton } from "./discard-button"
 import type { SalesFormApi } from "./form-types"
 import { InvalidIbanDialog } from "./invalid-iban-dialog"
+import type { NaamCorrection } from "./naam"
 import { AddressSection } from "./sections/address-section"
 import { ContactSection } from "./sections/contact-section"
 import { ContractSection } from "./sections/contract-section"
@@ -14,12 +15,14 @@ import { useIbanCheck } from "./use-iban-check"
 type Props = {
   form: SalesFormApi
   submitting: boolean
+  /** Capitalization fix made while filling in a scanned form. */
+  naamCorrection: NaamCorrection | null
   onSubmit: (values: FormValues) => void
   onDiscard: () => void
 }
 
 /** The sales form itself: four sections plus a fixed bottom bar with Wissen / Versturen. */
-export function SalesForm({ form, submitting, onSubmit, onDiscard }: Props) {
+export function SalesForm({ form, submitting, naamCorrection, onSubmit, onDiscard }: Props) {
   const iban = useIbanCheck(form, onSubmit)
   const busy = submitting || iban.checkingOnSubmit
 
@@ -29,7 +32,7 @@ export function SalesForm({ form, submitting, onSubmit, onDiscard }: Props) {
       noValidate
       className="mx-auto flex max-w-xl flex-col gap-4 p-4 pb-24"
     >
-      <CustomerSection control={form.control} />
+      <CustomerSection control={form.control} naamCorrection={naamCorrection} />
       <AddressSection form={form} />
       <ContactSection form={form} />
       <ContractSection form={form} iban={iban} />

@@ -4,6 +4,7 @@ import { EXTRACTABLE_FIELDS, type ExtractableField, type ExtractedFields, type F
 import { extractFromPhoto } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
 import type { SalesFormApi } from "./form-types"
+import { normalizeNaam, type NaamCorrection } from "./naam"
 import { prepareScanImage } from "./scan-image"
 
 // Fill animation: text fields are "typed" character by character, pickers are set at once.
@@ -17,12 +18,15 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 /**
  * Camera scan: uploads the photo, lets the backend read it with Claude and types the result into the form,
  * top to bottom. `phase` drives the blocking overlay: "reading" shows a spinner, "filling" only blocks input.
+ * The scanned name gets the same capitalization fix as a typed one; `naamCorrection` lets the field offer undo.
  */
 export function useScanFill(form: SalesFormApi, userId: string) {
   const [phase, setPhase] = useState<"reading" | "filling" | null>(null)
+  const [naamCorrection, setNaamCorrection] = useState<NaamCorrection | null>(null)
 
   async function scan(photo: File) {
     setPhase("reading")
+    setNaamCorrection(null)
     try {
       const { fields, mock } = await extractFromPhoto(userId, await prepareScanImage(photo))
       setPhase("filling")
@@ -39,8 +43,12 @@ export function useScanFill(form: SalesFormApi, userId: string) {
   async function typeIntoForm(fields: ExtractedFields) {
     const filled: ExtractableField[] = []
     for (const name of EXTRACTABLE_FIELDS) {
-      const value = fields[name]
+      let value = fields[name]
       if (value === undefined) continue
+      if (name === "naam" && normalizeNaam(value) !== value) {
+        setNaamCorrection({ typed: value, corrected: normalizeNaam(value) })
+        value = normalizeNaam(value)
+      }
       if (name === "email") form.setValue("perPost", false)
       filled.push(name)
       highlight(name)
@@ -68,7 +76,7 @@ export function useScanFill(form: SalesFormApi, userId: string) {
     form.setValue(name, value as FormInput[typeof name], { shouldDirty: true })
   }
 
-  return { phase, scan }
+  return { phase, naamCorrection, scan }
 }
 
 function highlight(name: ExtractableField) {
