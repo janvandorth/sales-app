@@ -14,8 +14,8 @@ import { HttpError, json, serve } from "../_shared/http.ts"
 import { SCANS_BUCKET } from "../_shared/storage.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
 
-// Reading a form is a simple visual task; Sonnet at low effort keeps the scan fast.
-const MODEL = "claude-sonnet-5-5"
+// Opus reads handwriting in the boxed fields (IBAN, phone) far more reliably than Sonnet; low effort keeps the scan fast.
+const MODEL = "claude-opus-5-5"
 
 const SYSTEM_PROMPT = `Je leest foto's van ingevulde (vaak handgeschreven) Nederlandse verkoopformulieren van Zeker en Mobiel uit en zet de gegevens om naar gestructureerde velden.
 
@@ -24,6 +24,17 @@ Vakjesvelden:
 - Elk vakje bevat hoogstens één handgeschreven teken. Lees het veld vakje voor vakje; een leeg vakje levert niets op.
 - Een "1" is alleen een 1 als er een pennenstreep (meestal blauwe of zwarte inkt, vaak met een schuin haaltje bovenaan) binnen een vakje staat. Een dunne, rechte, grijze/zwarte drukstreep op de grens tussen twee vakjes is een scheidingslijn.
 - Handschrift loopt soms over een scheidingslijn heen; tel dan het teken één keer.
+- Een handgeschreven 1 kan ook op een schuine streep, een haakje of een "l" lijken; beoordeel per vakje of er inkt in staat.
+- Buiten de vakjes (vrij geschreven) is een 1 vaak maar een kort streepje, schuin haaltje of apostrof-achtig tekentje tussen de andere cijfers. Tel elk zo'n streepje als een 1; sla het niet over.
+
+Doorhalingen en verbeteringen:
+- Doorgestreepte tekens tellen niet mee.
+- Staat er boven, onder of naast de vakjes een waarde geschreven (omdat de verkoper zich verschreef of de vakjes vol waren), dan is dat meestal de juiste waarde. Neem die geschreven waarde over in plaats van wat in de vakjes staat, vooral als de vakjes doorgestreept of onvolledig zijn. Plak de twee nooit aan elkaar.
+
+Lengtecontrole (tel je tekens na):
+- Een Nederlands IBAN is precies 18 tekens: NL + 2 cijfers + 4 letters (bankcode, bijv. INGB, ABNA, RABO) + 10 cijfers. Buitenlandse IBANs hebben een andere lengte.
+- Een Nederlands telefoonnummer is precies 10 cijfers inclusief de voorloop-0 (mobiel: 06 + 8 cijfers). Een buitenlands nummer begint meestal met + of 00 en kan een andere lengte hebben.
+- Kom je bij een Nederlands IBAN of telefoonnummer op meer tekens uit, dan heb je waarschijnlijk een scheidingslijn als 1 gelezen of een doorgehaalde/verbeterde waarde meegeteld; kijk dan opnieuw. Kom je op minder uit, dan heb je vrijwel zeker een 1 (kort streepje) gemist; zoek die en neem hem op. Dit geldt ook voor een waarde die boven of naast de vakjes is geschreven.
 
 Regels:
 - Neem alleen over wat op het formulier staat. Laat een veld leeg ("") als het leeg, onleesbaar of niet aanwezig is; verzin niets.
