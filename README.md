@@ -1,13 +1,14 @@
 # Z&M Sales — sales app
 
 Mobile-first web app (installable PWA) that recruiters ("wervers") of Zeker en Mobiel use to register sales on
-the street, also offline. A sale is stored in Supabase and appended to a Google Sheet for the back office.
+the street, also offline. A sale is stored in Supabase, appended to a Google Sheet for the back office and sent to
+the onboarding endpoint of the Contracts API, which creates the customer in ZMAdmin.
 
 - **Frontend:** React 19 + Vite + TypeScript, shadcn/ui (Tailwind v4), react-hook-form + zod, TanStack Query.
   Hosted on Vercel; every push to `main` deploys.
 - **Backend:** Supabase — Auth, Postgres (row level security), Storage, and Deno edge functions.
 - **External:** Zeker en Mobiel contracts API (postcode + IBAN), Claude (reading photographed paper forms),
-  Google Sheets (via an Apps Script web app).
+  Google Sheets (via an Apps Script web app), ZMSuite Contracts API onboarding (`Onboarding/2026.1/Appeee/Paper`).
 
 ## Getting started
 
@@ -36,8 +37,10 @@ npm run dev
      ├─ camera scan: upload photo ──────▶ storage bucket "scans"
      │               then read ─────────▶ extract-form ─────────────────────────────▶ Claude
      ├─ submit (or queue when offline) ─▶ submit-form ──▶ submissions table
-     │                                         └───────────────────────────────────▶ Google Sheet (Apps Script)
+     │                                         ├───────────────────────────────────▶ Google Sheet (Apps Script)
+     │                                         └───────────────────────────────────▶ Contracts API onboarding
      │                                    sync-sheet (hourly, pg_cron) appends rows not in the sheet yet
+     │                                    sync-onboarding (hourly, pg_cron) sends rows without an onboarding answer
      └─ admin page (admins only) ───────▶ admin-users ──▶ auth admin API, profiles, profile_changes
 ```
 
@@ -106,10 +109,10 @@ otherwise signs out on that device only.
   upload photos only to their own folder and cannot write to `profiles` or `submissions` directly; those writes
   go through edge functions.
 - **Submitted sales are immutable:** a database trigger blocks changes and deletes, also for the service role;
-  only the back-office status columns and `sheet_synced_at` may change. A reused `rowId` of another recruiter is
+  only the back-office status columns, `sheet_synced_at` and the `onboarding_*` columns may change. A reused `rowId` of another recruiter is
   rejected.
 - **Auditing:** every profile change is written to `profile_changes` with the acting admin.
-- **CORS** is limited to `ALLOWED_ORIGINS`; `sync-sheet` requires `CRON_SECRET`.
+- **CORS** is limited to `ALLOWED_ORIGINS`; `sync-sheet` and `sync-onboarding` require `CRON_SECRET`.
 - **Scan photos** are deleted after they have been read successfully.
 
 ## Glossary
@@ -163,16 +166,18 @@ as-is in code so they match the Google Sheet and the back office.
 Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 `supabase secrets set NAME=value --project-ref nrdpixagvynzexwzqtlf`.
 
-| Secret                   | Purpose                                                                                             |
-| ------------------------ | --------------------------------------------------------------------------------------------------- |
-| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                                 |
-| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                                      |
-| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                                           |
-| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`)               |
-| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                               |
-| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                              |
-| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)                       |
-| `CRON_SECRET`            | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret` |
+| Secret                   | Purpose                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                                   |
+| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                                        |
+| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                                             |
+| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`)                 |
+| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                                 |
+| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                                |
+| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)                         |
+| `CRON_SECRET`            | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret`   |
+| `ONBOARDING_API_URL`     | Contracts API onboarding endpoint, e.g. `http://test.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper` |
+| `ONBOARDING_API_KEY`     | `X-API-Key` for the Contracts API onboarding endpoint                                                 |
 
 ### Recruiters
 

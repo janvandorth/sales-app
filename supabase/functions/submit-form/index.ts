@@ -3,6 +3,7 @@ import { requireUser } from "../_shared/auth.ts"
 import { formSchema } from "../_shared/form-schema.ts"
 import { appendSheetRow, isSheetsConfigured } from "../_shared/google-sheets.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
+import { isOnboardingConfigured, sendToOnboarding } from "../_shared/onboarding.ts"
 import { toSheetRow, toSubmissionRecord } from "../_shared/submission-record.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
 
@@ -35,14 +36,17 @@ serve(async (req) => {
   const isNew = inserted.length > 0
   if (!isNew) await assertOwnedBy(admin, record.row_id, user.id)
 
-  if (isNew && isSheetsConfigured()) {
-    try {
-      await appendSheetRow(toSheetRow(record))
-      await admin.from("submissions").update({ sheet_synced_at: new Date().toISOString() }).eq("row_id", record.row_id)
-    } catch (error) {
-      // The submission is safely stored; rows with sheet_synced_at = null are picked up by sync-sheet.
-      console.error(error)
-    }
+  // The submission is safely stored; whatever fails here is retried by sync-sheet and sync-onboarding.
+  if (isNew) {
+    await Promise.all([
+      isSheetsConfigured() &&
+        appendSheetRow(toSheetRow(record))
+          .then(() =>
+            admin.from("submissions").update({ sheet_synced_at: new Date().toISOString() }).eq("row_id", record.row_id),
+          )
+          .catch(console.error),
+      isOnboardingConfigured() && sendToOnboarding(admin, record).catch(console.error),
+    ])
   }
 
   return json({ ok: true, rowId: record.row_id, duplicate: !isNew })

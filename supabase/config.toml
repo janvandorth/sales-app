@@ -322,3 +322,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # Called by pg_cron with the CRON_SECRET header instead of a user token.
 [functions.sync-sheet]
 verify_jwt = false
+
+# Called by pg_cron with the CRON_SECRET header instead of a user token.
+[functions.sync-onboarding]
+verify_jwt = false
