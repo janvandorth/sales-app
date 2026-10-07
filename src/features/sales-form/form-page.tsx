@@ -20,10 +20,10 @@ import { ScanOverlay } from "./scan-overlay"
 import { useDraft } from "./use-draft"
 import { useScanFill } from "./use-scan-fill"
 
-type Props = { session: Session; onOpenAdmin: () => void }
+type Props = { session: Session; onOpenDashboard: () => void; onOpenAdmin: () => void }
 
 /** Main page after login: header, the sales form, the outbox dialog and the scan overlay. */
-export function FormPage({ session, onOpenAdmin }: Props) {
+export function FormPage({ session, onOpenDashboard, onOpenAdmin }: Props) {
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
@@ -98,6 +98,7 @@ export function FormPage({ session, onOpenAdmin }: Props) {
         outbox={outbox.items}
         syncing={outbox.syncing}
         onOpenOutbox={() => setOutboxOpen(true)}
+        onOpenDashboard={onOpenDashboard}
         onOpenAdmin={onOpenAdmin}
         onSignOut={handleSignOut}
       />

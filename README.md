@@ -41,6 +41,7 @@ npm run dev
      │                                         └───────────────────────────────────▶ Contracts API onboarding
      │                                    sync-sheet (hourly, pg_cron) appends rows not in the sheet yet
      │                                    sync-onboarding (hourly, pg_cron) sends rows without an onboarding answer
+     ├─ dashboard ──────────────────────▶ kpi ─────────────────────────────────────────▶ Contracts API stats (ZMAdmin)
      └─ admin page (admins only) ───────▶ admin-users ──▶ auth admin API, profiles, profile_changes
 ```
 
@@ -65,6 +66,7 @@ src/
       use-draft.ts              Restore/autosave the unfinished form (IndexedDB)
       use-scan-fill.ts          Camera scan → Claude → typing animation into the form
     outbox/                     Offline queue ("Wachtrij"): storage, auto-send hook, dialog
+    dashboard/                  Results: sales per week/month, cancellations and their reasons (account menu)
     admin/                      Recruiter management (list, invite, edit, block)
   components/                   Shared UI: page-header.tsx and shadcn components in ui/ (generated)
   hooks/                        Generic hooks: useOnline, useDebouncedCheck, useProfile
@@ -96,6 +98,16 @@ but online the recruiter has to confirm it first.
 **Camera scan.** The photo is downscaled, uploaded to the private `scans` bucket and read by `extract-form`
 with Claude (structured output generated from `extractionSchema`). The photo is deleted after a successful read.
 Without `ANTHROPIC_API_KEY` the function returns demo data.
+
+**Dashboard.** Account menu → "Mijn resultaten" (recruiters) or "Resultaten team" (admins). The `kpi` function
+reads ZMAdmin through the Contracts API (`GET …/Sales/2026.1/Stats`, ZMSuite branch `Jan/feature/sales-stats`):
+gross sales per day and recruiter, with each cancellation counted on the day of the sale, plus the cancelled
+customers with their reason. A recruiter always gets their own wervernr (which must be their ZMAdmin recruiter
+code); only admins may pick another recruiter or the whole team. "Opzeggingen bijgewerkt t/m" is the most recent
+cancellation entered in ZMAdmin; periods ending less than four weeks before that are hatched as not complete. The
+app loads a year at a time going back ("Eerder"). Without `STATS_API_URL`/`STATS_API_KEY` the function returns
+made-up numbers and the page says so. In development, open `http://localhost:5173/?demo` (sales manager) or
+`?demo=werver` to see the dashboard with demo data without logging in.
 
 **Login.** Accounts are invite-only (sign-ups are disabled). An invite or password-reset email opens the app on
 the set-password screen. If the server rejects a session (e.g. revoked), the app refreshes it once and
@@ -133,6 +145,8 @@ as-is in code so they match the Google Sheet and the back office.
 | contracttype                   | Service or Zakelijk (business)                                                 |
 | betaaltermijn / betaalperiode  | Payment term and method (machtiging = direct debit, acceptgiro = payment slip) |
 | opmerkingen                    | Remarks (digital only, not on the paper form)                                  |
+| bruto / netto                  | Sales written / sales that were not cancelled                                  |
+| opzegging / opgezegd / uitval  | Cancellation / cancelled / share of the sales that was cancelled               |
 | wachtrij / outbox              | Forms waiting to be sent (`features/outbox`)                                   |
 | Bellijst                       | Former name of the app ("call list"); now called Z&M Sales                     |
 
@@ -166,18 +180,20 @@ as-is in code so they match the Google Sheet and the back office.
 Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 `supabase secrets set NAME=value --project-ref nrdpixagvynzexwzqtlf`.
 
-| Secret                   | Purpose                                                                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                                   |
-| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                                        |
-| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                                             |
-| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`)                 |
-| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                                 |
-| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                                |
-| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)                         |
-| `CRON_SECRET`            | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret`   |
-| `ONBOARDING_API_URL`     | Contracts API onboarding endpoint, e.g. `http://test.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper` |
-| `ONBOARDING_API_KEY`     | `X-API-Key` for the Contracts API onboarding endpoint                                                 |
+| Secret                   | Purpose                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                                    |
+| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                                         |
+| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                                              |
+| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`)                  |
+| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                                  |
+| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                                 |
+| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)                          |
+| `CRON_SECRET`            | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret`    |
+| `ONBOARDING_API_URL`     | Contracts API onboarding endpoint, e.g. `http://test.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper`  |
+| `ONBOARDING_API_KEY`     | `X-API-Key` for the Contracts API onboarding endpoint                                                  |
+| `STATS_API_URL`          | Contracts API stats endpoint for the dashboard, e.g. `http://test.zekerenmobiel.nl/Sales/2026.1/Stats` |
+| `STATS_API_KEY`          | `X-API-Key` for the stats endpoint; without URL and key the dashboard shows demo numbers               |
 
 ### Recruiters
 

@@ -30,12 +30,16 @@ async function fetchProfile(userId: string): Promise<Profile> {
   return profile
 }
 
-/** The recruiter's own profile. The last known value is kept in localStorage so it is available offline. */
-export function useProfile(userId: string): Profile | undefined {
+/**
+ * The recruiter's own profile (undefined while logged out). The last known value is kept in localStorage so it is
+ * available offline.
+ */
+export function useProfile(userId: string | undefined): Profile | undefined {
   const { data } = useQuery({
     queryKey: ["profile", userId],
-    queryFn: () => fetchProfile(userId),
-    placeholderData: () => readCachedProfile(userId),
+    queryFn: () => fetchProfile(userId!),
+    placeholderData: () => (userId ? readCachedProfile(userId) : undefined),
+    enabled: userId !== undefined,
   })
   return data
 }

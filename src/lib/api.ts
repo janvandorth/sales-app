@@ -7,6 +7,7 @@ import {
 } from "@supabase/supabase-js"
 import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
+import type { KpiRequest, KpiResponse } from "@shared/kpi"
 import { SCANS_BUCKET } from "@shared/storage"
 import { ApiError, AuthError, NetworkError } from "@/lib/errors"
 import { supabase } from "@/lib/supabase"
@@ -77,6 +78,29 @@ export async function extractFromPhoto(
   if (error) throw new ApiError("Uploaden van de foto is mislukt", 500)
 
   return invoke<{ fields: ExtractedFields; mock: boolean }>("extract-form", { path })
+}
+
+// --- Dashboard ----------------------------------------------------------------------------------
+
+/**
+ * Dev only: open the app with `?demo` (sales manager) or `?demo=werver` to see the dashboard with made-up numbers
+ * without logging in. `import.meta.env.DEV` is false in a production build, so none of this ships.
+ */
+export const DEMO_MODE: "admin" | "werver" | null =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has("demo")
+    ? new URLSearchParams(window.location.search).get("demo") === "werver"
+      ? "werver"
+      : "admin"
+    : null
+
+export async function getKpi(request: KpiRequest): Promise<KpiResponse> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoSalesStats } = await import("@shared/kpi-demo")
+    const wervernr = DEMO_MODE === "werver" ? "0212BB" : (request.wervernr ?? null)
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return { demo: true, wervernr, stats: demoSalesStats(request.from, request.to, wervernr) }
+  }
+  return invoke<KpiResponse>("kpi", { ...request })
 }
 
 // --- Admin ---------------------------------------------------------------------------------------

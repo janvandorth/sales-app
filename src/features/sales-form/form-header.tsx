@@ -1,4 +1,4 @@
-import { CameraIcon, CloudOffIcon, LogOutIcon, RefreshCwIcon, UserIcon, UsersIcon } from "lucide-react"
+import { ChartColumnIcon, CameraIcon, CloudOffIcon, LogOutIcon, RefreshCwIcon, UserIcon, UsersIcon } from "lucide-react"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,13 +23,18 @@ type Props = {
   outbox: OutboxItem[]
   syncing: boolean
   onOpenOutbox: () => void
+  onOpenDashboard: () => void
   onOpenAdmin: () => void
   onSignOut: () => void
 }
 
+/** Menu items sized for a thumb on the street: at least 48px high. */
+const MENU_ITEM_CLASS = "min-h-12 gap-3 px-3 text-base [&_svg:not([class*='size-'])]:size-5"
+
 /** Header of the form page: camera scan, logo, offline/outbox status and the account menu. */
 export function FormHeader(props: Props) {
-  const { profile, email, online, scanDisabled, onScan, outbox, syncing, onOpenOutbox, onOpenAdmin, onSignOut } = props
+  const { profile, email, online, scanDisabled, onScan, outbox, syncing } = props
+  const { onOpenOutbox, onOpenDashboard, onOpenAdmin, onSignOut } = props
 
   return (
     <PageHeader
@@ -75,17 +80,17 @@ export function FormHeader(props: Props) {
                 <UserIcon />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="flex flex-col">
+            <DropdownMenuContent align="end" className="w-64 p-1.5">
+              <DropdownMenuLabel className="flex flex-col px-3 py-2 text-base">
                 <span>{profile?.wervernaam ?? email}</span>
                 {profile && (
-                  <span className="text-xs font-normal text-muted-foreground">Wervernr. {profile.wervernr}</span>
+                  <span className="text-sm font-normal text-muted-foreground">Wervernr. {profile.wervernr}</span>
                 )}
               </DropdownMenuLabel>
               {outbox.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onOpenOutbox}>
+                  <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenOutbox}>
                     <RefreshCwIcon /> Wachtrij ({outbox.length})
                     {outbox.some((item) => item.rejectedReason) && (
                       <span className="ml-auto text-xs text-destructive">geweigerd</span>
@@ -94,12 +99,16 @@ export function FormHeader(props: Props) {
                 </>
               )}
               <DropdownMenuSeparator />
+              <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenDashboard}>
+                <ChartColumnIcon /> {profile?.isAdmin ? "Resultaten team" : "Mijn resultaten"}
+              </DropdownMenuItem>
               {profile?.isAdmin && (
-                <DropdownMenuItem onClick={onOpenAdmin}>
+                <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenAdmin}>
                   <UsersIcon /> Beheer wervers
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={onSignOut}>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onSignOut}>
                 <LogOutIcon /> Uitloggen
               </DropdownMenuItem>
             </DropdownMenuContent>
