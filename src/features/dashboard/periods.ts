@@ -99,14 +99,15 @@ export function kpiWindow(page: number, until: string): { from: string; to: stri
   }
 }
 
-/** The reasons of the sales in one period, most frequent first. */
+/** The reasons of the sales in one period (or all of them, for null), most frequent first. */
 export function reasonsIn(
   reasons: SalesStatsReason[],
-  period: Pick<Period, "start" | "end">,
+  period: Pick<Period, "start" | "end"> | null,
 ): { reason: string; count: number }[] {
   const counts = new Map<string, number>()
   for (const r of reasons) {
-    if (r.date >= period.start && r.date <= period.end) counts.set(r.reason, (counts.get(r.reason) ?? 0) + r.count)
+    if (period && !(r.date && r.date >= period.start && r.date <= period.end)) continue
+    counts.set(r.reason, (counts.get(r.reason) ?? 0) + r.count)
   }
   return [...counts]
     .map(([reason, count]) => ({ reason, count }))

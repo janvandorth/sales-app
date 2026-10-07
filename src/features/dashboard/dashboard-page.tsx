@@ -15,6 +15,7 @@ import { PeriodChart } from "./period-chart"
 import {
   addDays,
   buildPeriods,
+  formatDay,
   formatTimestamp,
   isProvisional,
   periodDates,
@@ -57,6 +58,19 @@ export function DashboardPage({ profile, onBack }: Props) {
   const recruiters = team.data?.stats.recruiters ?? data?.stats.recruiters ?? []
   // "week 41" or "juni 2025" in card titles; the bar at the top has the dates.
   const periodName = selected ? periodTitle(selected, granularity) : ""
+
+  // A recruiter's reasons come from their own cancellations, which carry the sale day. The team only has the totals
+  // per reason; per period once the endpoint sends their sale day (see SalesStats.reasons).
+  const reasonsPerPeriod = wervernr !== null || (data?.stats.reasons.every((r) => r.date) ?? true)
+  const reasons =
+    !data || !selected
+      ? []
+      : wervernr !== null
+        ? reasonsIn(
+            data.stats.cancellations.map((c) => ({ date: c.soldOn, reason: c.reason, count: 1 })),
+            selected,
+          )
+        : reasonsIn(data.stats.reasons, reasonsPerPeriod ? selected : null)
 
   function changeGranularity(next: Granularity) {
     // Stay on the same moment: the week or month that contains the selected period's first day.
@@ -267,10 +281,16 @@ export function DashboardPage({ profile, onBack }: Props) {
 
             <Card>
               <CardHeader>
-                <CardTitle>Redenen van opzeggingen · {periodName}</CardTitle>
+                <CardTitle>Redenen van opzeggingen · {reasonsPerPeriod ? periodName : "alles geladen"}</CardTitle>
+                {!reasonsPerPeriod && (
+                  <CardDescription>
+                    Verkopen sinds {formatDay(data.from)} {data.from.slice(0, 4)}; per{" "}
+                    {granularity === "week" ? "week" : "maand"} volgt nog.
+                  </CardDescription>
+                )}
               </CardHeader>
               <CardContent>
-                <ReasonList reasons={reasonsIn(data.stats.reasons, selected)} />
+                <ReasonList reasons={reasons} />
               </CardContent>
             </Card>
           </>

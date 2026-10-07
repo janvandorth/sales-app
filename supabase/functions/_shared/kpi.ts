@@ -40,8 +40,11 @@ export const salesStatsSchema = z.object({
       detail: z.string(),
     }),
   ),
-  /** Reasons of the cancelled sales per sale day, so they follow the selected week or month. */
-  reasons: z.array(z.object({ date: isoDate, reason: z.string(), count: z.number().int() })),
+  /**
+   * Reasons of the cancelled sales per sale day, so they follow the selected week or month. `date` is optional until
+   * the endpoint sends it (ZMSuite change request); without it the team view shows totals for the loaded range.
+   */
+  reasons: z.array(z.object({ date: isoDate.optional(), reason: z.string(), count: z.number().int() })),
 })
 
 export type SalesStats = z.infer<typeof salesStatsSchema>

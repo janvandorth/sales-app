@@ -116,4 +116,16 @@ describe("reasonsIn", () => {
       { reason: "Te duur", count: 1 },
     ])
   })
+
+  it("adds up everything without a period, also reasons without a date", () => {
+    expect(
+      reasonsIn(
+        [
+          { reason: "Bedacht", count: 2 },
+          { date: "2026-09-07", reason: "Bedacht", count: 1 },
+        ],
+        null,
+      ),
+    ).toEqual([{ reason: "Bedacht", count: 3 }])
+  })
 })
