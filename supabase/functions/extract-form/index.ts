@@ -19,6 +19,12 @@ const MODEL = "claude-sonnet-5-5"
 
 const SYSTEM_PROMPT = `Je leest foto's van ingevulde (vaak handgeschreven) Nederlandse verkoopformulieren van Zeker en Mobiel uit en zet de gegevens om naar gestructureerde velden.
 
+Vakjesvelden:
+- Voorletters, huisnummer, postcode, telefoonnummer en IBAN staan op het formulier in een rij vakjes die van elkaar gescheiden zijn door voorgedrukte verticale streepjes (|). Die streepjes horen bij het formulier en zijn GEEN tekens: lees ze nooit als "1", "I", "l" of "|".
+- Elk vakje bevat hoogstens één handgeschreven teken. Lees het veld vakje voor vakje; een leeg vakje levert niets op.
+- Een "1" is alleen een 1 als er een pennenstreep (meestal blauwe of zwarte inkt, vaak met een schuin haaltje bovenaan) binnen een vakje staat. Een dunne, rechte, grijze/zwarte drukstreep op de grens tussen twee vakjes is een scheidingslijn.
+- Handschrift loopt soms over een scheidingslijn heen; tel dan het teken één keer.
+
 Regels:
 - Neem alleen over wat op het formulier staat. Laat een veld leeg ("") als het leeg, onleesbaar of niet aanwezig is; verzin niets.
 - naam: voorletters met punten + achternaam, bijv. "P.J. Jansen" of "A. van der Berg".
