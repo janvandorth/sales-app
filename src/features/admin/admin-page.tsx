@@ -11,7 +11,7 @@ import {
   UserPlusIcon,
 } from "lucide-react"
 import type { AdminUser } from "@shared/admin-types"
-import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
+import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,7 +35,6 @@ export function AdminPage({ currentUserId, onBack }: Props) {
   return (
     <div className="min-h-svh bg-muted">
       <PageHeader
-        maxWidth="3xl"
         start={
           <Button
             variant="ghost"
@@ -61,7 +60,7 @@ export function AdminPage({ currentUserId, onBack }: Props) {
         }
       />
 
-      <main className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
+      <main className={`mx-auto flex flex-col gap-4 p-4 ${PAGE_WIDTH}`}>
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">
             {users.data ? `${users.data.length} gebruiker${users.data.length === 1 ? "" : "s"}` : "Laden…"}

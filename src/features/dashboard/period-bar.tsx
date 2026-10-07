@@ -1,4 +1,5 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { PAGE_WIDTH } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
@@ -29,7 +30,7 @@ export function PeriodBar(props: Props) {
 
   return (
     <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 border-b bg-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-xl items-center gap-2 px-4 py-2">
+      <div className={`mx-auto flex items-center gap-2 px-4 py-2 ${PAGE_WIDTH}`}>
         <div
           role="group"
           aria-label="Alle cijfers per week of per maand"
@@ -51,7 +52,7 @@ export function PeriodBar(props: Props) {
           ))}
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center">
+        <div className="flex min-w-0 flex-1 items-center lg:w-96 lg:flex-none">
           <Button
             variant="ghost"
             size="icon"

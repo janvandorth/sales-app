@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { ArrowLeftIcon, ChevronDownIcon, ClockIcon, RefreshCwIcon } from "lucide-react"
-import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
+import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -155,7 +155,8 @@ export function DashboardPage({ profile, onBack }: Props) {
 
       <main
         className={cn(
-          "mx-auto flex max-w-xl flex-col gap-4 p-4 transition-opacity",
+          "mx-auto flex flex-col gap-4 p-4 transition-opacity",
+          PAGE_WIDTH,
           kpi.isPlaceholderData && "pointer-events-none opacity-50",
         )}
         aria-busy={kpi.isPlaceholderData}
@@ -178,122 +179,126 @@ export function DashboardPage({ profile, onBack }: Props) {
         )}
 
         {data && selected && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
-                  <span className="first-letter:uppercase">{periodName}</span>
-                  {provisional && (
-                    <Badge variant="secondary">
-                      <ClockIcon /> voorlopig
-                    </Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <StatTiles period={selected} />
-                <div className="flex gap-2 text-xs text-muted-foreground">
-                  <ClockIcon className="size-4 shrink-0" />
-                  <p>
-                    Opzeggingen bijgewerkt t/m{" "}
-                    <strong className="font-semibold text-foreground">
-                      {enteredUntil ? formatTimestamp(enteredUntil) : "onbekend"}
-                    </strong>
-                    .
-                    {provisional &&
-                      ` Opzeggingen komen vaak pas weken na de verkoop binnen; deze cijfers zijn compleet als dat tot ${SETTLE_DAYS / 7} weken na deze periode is bijgewerkt.`}
-                  </p>
-                </div>
-                {data.demo && (
-                  <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                    Voorbeeldcijfers: de koppeling met ZMAdmin staat nog niet aan. Namen en aantallen zijn verzonnen.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Verloop per {granularity === "week" ? "week" : "maand"}</CardTitle>
-                <CardDescription>
-                  Tik op een {granularity === "week" ? "week" : "maand"} om die te bekijken.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <PeriodChart
-                  periods={periods}
-                  granularity={granularity}
-                  selectedKey={selected.key}
-                  onSelect={setSelectedKey}
-                  isProvisional={(period) => isProvisional(period, enteredUntil)}
-                  canLoadMore={kpi.hasNextPage}
-                  loadingMore={kpi.isFetchingNextPage}
-                  onLoadMore={() => void kpi.fetchNextPage()}
-                />
-                <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <li className="flex items-center gap-1.5">
-                    <span aria-hidden className="size-2.5 rounded-[3px] bg-netto" /> Netto
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span aria-hidden className="size-2.5 rounded-[3px] bg-opgezegd" /> Opgezegd
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span
-                      aria-hidden
-                      className="size-2.5 rounded-[3px] bg-[repeating-linear-gradient(135deg,transparent_0_2px,var(--color-muted-foreground)_2px_3px)]"
-                    />
-                    Nog niet compleet
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {wervernr === null ? "Per werver" : "Opzeggingen"} · {periodName}
-                </CardTitle>
-                <CardDescription>
-                  {wervernr === null
-                    ? "Tik op een werver voor diens opzeggingen."
-                    : "Opgezegde klanten uit de verkopen van deze periode."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {wervernr === null ? (
-                  <TeamTable
-                    stats={data.stats}
-                    period={selected}
-                    onPick={(number) => {
-                      setPicked(number)
-                      window.scrollTo({ top: 0 })
-                    }}
-                  />
-                ) : (
-                  <CancellationList
-                    items={data.stats.cancellations.filter(
-                      (c) => c.soldOn >= selected.start && c.soldOn <= selected.end,
+          // Large screens: the numbers and the trend on the left, the people and the reasons on the right.
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            <div className="flex min-w-0 flex-col gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex flex-wrap items-center gap-2">
+                    <span className="first-letter:uppercase">{periodName}</span>
+                    {provisional && (
+                      <Badge variant="secondary">
+                        <ClockIcon /> voorlopig
+                      </Badge>
                     )}
-                  />
-                )}
-              </CardContent>
-            </Card>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <StatTiles period={selected} />
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <ClockIcon className="size-4 shrink-0" />
+                    <p>
+                      Opzeggingen bijgewerkt t/m{" "}
+                      <strong className="font-semibold text-foreground">
+                        {enteredUntil ? formatTimestamp(enteredUntil) : "onbekend"}
+                      </strong>
+                      .
+                      {provisional &&
+                        ` Opzeggingen komen vaak pas weken na de verkoop binnen; deze cijfers zijn compleet als dat tot ${SETTLE_DAYS / 7} weken na deze periode is bijgewerkt.`}
+                    </p>
+                  </div>
+                  {data.demo && (
+                    <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                      Voorbeeldcijfers: de koppeling met ZMAdmin staat nog niet aan. Namen en aantallen zijn verzonnen.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Redenen van opzeggingen · {reasonsPerPeriod ? periodName : "alles geladen"}</CardTitle>
-                {!reasonsPerPeriod && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Verloop per {granularity === "week" ? "week" : "maand"}</CardTitle>
                   <CardDescription>
-                    Verkopen sinds {formatDay(data.from)} {data.from.slice(0, 4)}; per{" "}
-                    {granularity === "week" ? "week" : "maand"} volgt nog.
+                    Tik op een {granularity === "week" ? "week" : "maand"} om die te bekijken.
                   </CardDescription>
-                )}
-              </CardHeader>
-              <CardContent>
-                <ReasonList reasons={reasons} />
-              </CardContent>
-            </Card>
-          </>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <PeriodChart
+                    periods={periods}
+                    granularity={granularity}
+                    selectedKey={selected.key}
+                    onSelect={setSelectedKey}
+                    isProvisional={(period) => isProvisional(period, enteredUntil)}
+                    canLoadMore={kpi.hasNextPage}
+                    loadingMore={kpi.isFetchingNextPage}
+                    onLoadMore={() => void kpi.fetchNextPage()}
+                  />
+                  <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <li className="flex items-center gap-1.5">
+                      <span aria-hidden className="size-2.5 rounded-[3px] bg-netto" /> Netto
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span aria-hidden className="size-2.5 rounded-[3px] bg-opgezegd" /> Opgezegd
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="size-2.5 rounded-[3px] bg-[repeating-linear-gradient(135deg,transparent_0_2px,var(--color-muted-foreground)_2px_3px)]"
+                      />
+                      Nog niet compleet
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="flex min-w-0 flex-col gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {wervernr === null ? "Per werver" : "Opzeggingen"} · {periodName}
+                  </CardTitle>
+                  <CardDescription>
+                    {wervernr === null
+                      ? "Tik op een werver voor diens opzeggingen."
+                      : "Opgezegde klanten uit de verkopen van deze periode."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {wervernr === null ? (
+                    <TeamTable
+                      stats={data.stats}
+                      period={selected}
+                      onPick={(number) => {
+                        setPicked(number)
+                        window.scrollTo({ top: 0 })
+                      }}
+                    />
+                  ) : (
+                    <CancellationList
+                      items={data.stats.cancellations.filter(
+                        (c) => c.soldOn >= selected.start && c.soldOn <= selected.end,
+                      )}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Redenen van opzeggingen · {reasonsPerPeriod ? periodName : "alles geladen"}</CardTitle>
+                  {!reasonsPerPeriod && (
+                    <CardDescription>
+                      Verkopen sinds {formatDay(data.from)} {data.from.slice(0, 4)}; per{" "}
+                      {granularity === "week" ? "week" : "maand"} volgt nog.
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <ReasonList reasons={reasons} />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         )}
       </main>
     </div>
