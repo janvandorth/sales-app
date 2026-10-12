@@ -1,4 +1,5 @@
 import { requireUser } from "../_shared/auth.ts"
+import { statsUrl } from "../_shared/contracts-api.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { kpiRequestSchema, salesStatsSchema, type KpiResponse, type SalesStats } from "../_shared/kpi.ts"
@@ -7,7 +8,7 @@ import { demoSalesStats } from "../_shared/kpi-demo.ts"
 // Sales and cancellations for the dashboard, from ZMAdmin via the Contracts API (GET .../Sales/2026.1/Stats).
 // That endpoint returns anything for anyone with the API key, so who may see what is decided here: a recruiter
 // always gets their own wervernr, only an admin may choose another recruiter or the whole team.
-// Without STATS_API_URL and STATS_API_KEY the numbers are made up (demo mode).
+// Without STATS_API_KEY the numbers are made up (demo mode).
 
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
@@ -25,12 +26,10 @@ serve(async (req) => {
 
   const wervernr = profile.is_admin ? parsed.data.wervernr || null : profile.wervernr
 
-  const url = optionalEnv("STATS_API_URL")
   const key = optionalEnv("STATS_API_KEY")
-  const response: KpiResponse =
-    url && key
-      ? { demo: false, wervernr, stats: await fetchStats(url, key, from, to, wervernr) }
-      : { demo: true, wervernr, stats: demoSalesStats(from, to, wervernr) }
+  const response: KpiResponse = key
+    ? { demo: false, wervernr, stats: await fetchStats(statsUrl(), key, from, to, wervernr) }
+    : { demo: true, wervernr, stats: demoSalesStats(from, to, wervernr) }
   return json(response)
 })
 

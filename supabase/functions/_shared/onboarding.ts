@@ -1,3 +1,4 @@
+import { onboardingUrl } from "./contracts-api.ts"
 import { optionalEnv, requireEnv } from "./env.ts"
 import { toOnboardingRequest } from "./onboarding-request.ts"
 import type { SubmissionRecord } from "./submission-record.ts"
@@ -6,9 +7,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 // Sends sales to the Zeker en Mobiel onboarding endpoint (Contracts API, POST .../Onboarding/2026.1/Appeee/Paper),
 // which queues them to be written as customers in ZMAdmin.
 
-/** True when the onboarding endpoint is configured. */
+/** True when the onboarding endpoint has a key; the URL comes from contracts-api.ts. */
 export function isOnboardingConfigured(): boolean {
-  return Boolean(optionalEnv("ONBOARDING_API_URL") && optionalEnv("ONBOARDING_API_KEY"))
+  return Boolean(optionalEnv("ONBOARDING_API_KEY"))
 }
 
 /**
@@ -26,7 +27,7 @@ type OnboardingResponse = { correlationId?: string; regNr?: string; message?: st
 
 /** Sends one submission and stores the outcome on it. Throws when the outcome is unknown (retry later). */
 export async function sendToOnboarding(admin: SupabaseClient, record: SubmissionRecord): Promise<OnboardingStatus> {
-  const response = await fetch(requireEnv("ONBOARDING_API_URL"), {
+  const response = await fetch(onboardingUrl(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

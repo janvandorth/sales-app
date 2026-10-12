@@ -105,7 +105,7 @@ gross sales per day and recruiter, with each cancellation counted on the day of 
 customers with their reason. A recruiter always gets their own wervernr (which must be their ZMAdmin recruiter
 code); only admins may pick another recruiter or the whole team. "Opzeggingen bijgewerkt t/m" is the most recent
 cancellation entered in ZMAdmin; periods ending less than four weeks before that are hatched as not complete. The
-app loads a year at a time going back ("Eerder"). Without `STATS_API_URL`/`STATS_API_KEY` the function returns
+app loads a year at a time going back ("Eerder"). Without `STATS_API_KEY` the function returns
 made-up numbers and the page says so. In development, open `http://localhost:5173/?demo` (sales manager) or
 `?demo=werver` to see the dashboard with demo data without logging in.
 
@@ -180,20 +180,20 @@ as-is in code so they match the Google Sheet and the back office.
 Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 `supabase secrets set NAME=value --project-ref nrdpixagvynzexwzqtlf`.
 
-| Secret                   | Purpose                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                                    |
-| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                                         |
-| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                                              |
-| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`)                  |
-| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                                  |
-| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                                 |
-| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)                          |
-| `CRON_SECRET`            | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret`    |
-| `ONBOARDING_API_URL`     | Contracts API onboarding endpoint, e.g. `http://test.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper`  |
-| `ONBOARDING_API_KEY`     | `X-API-Key` for the Contracts API onboarding endpoint                                                  |
-| `STATS_API_URL`          | Contracts API stats endpoint for the dashboard, e.g. `http://test.zekerenmobiel.nl/Sales/2026.1/Stats` |
-| `STATS_API_KEY`          | `X-API-Key` for the stats endpoint; without URL and key the dashboard shows demo numbers               |
+| Secret                   | Purpose                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `ZM_API_KEY`             | Zeker en Mobiel contracts API key (postcode + IBAN)                                                 |
+| `ANTHROPIC_API_KEY`      | Enables real camera scans (without it, scans return demo data)                                      |
+| `ANTHROPIC_WORKSPACE_ID` | Only needed when the API key is not scoped to a workspace                                           |
+| `SHEETS_WEBHOOK_URL`     | Apps Script web app URL of the Google Sheet (see `supabase/google-sheets-webhook.gs`)               |
+| `SHEETS_WEBHOOK_SECRET`  | Shared secret; must equal `SECRET` in the Apps Script                                               |
+| `SHEETS_TAB`             | Optional tab name (default: first tab)                                                              |
+| `ALLOWED_ORIGINS`        | Browser origins allowed to call the functions (comma separated, `*` wildcard)                       |
+| `CRON_SECRET`            | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret` |
+| `ONBOARDING_API_ENV`     | `production` or unset (= test); URLs are in `supabase/functions/_shared/contracts-api.ts`           |
+| `ONBOARDING_API_KEY`     | `X-API-Key` for the Contracts API onboarding endpoint                                               |
+| `STATS_API_ENV`          | `production` or unset (= test), like `ONBOARDING_API_ENV`                                           |
+| `STATS_API_KEY`          | `X-API-Key` for the stats endpoint; without it the dashboard shows demo numbers                     |
 
 ### Recruiters
 
