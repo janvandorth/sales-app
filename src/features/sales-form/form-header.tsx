@@ -3,6 +3,7 @@ import {
   CameraIcon,
   ClipboardListIcon,
   CloudOffIcon,
+  KeyRoundIcon,
   LogOutIcon,
   RefreshCwIcon,
   UserIcon,
@@ -35,6 +36,7 @@ type Props = {
   onOpenDashboard: () => void
   onOpenSales: () => void
   onOpenAdmin: () => void
+  onChangePassword: () => void
   onSignOut: () => void
 }
 
@@ -44,7 +46,7 @@ const MENU_ITEM_CLASS = "min-h-12 gap-3 px-3 text-base [&_svg:not([class*='size-
 /** Header of the form page: camera scan, logo, offline/outbox status and the account menu. */
 export function FormHeader(props: Props) {
   const { profile, email, online, scanDisabled, onScan, outbox, syncing } = props
-  const { onOpenOutbox, onOpenDashboard, onOpenSales, onOpenAdmin, onSignOut } = props
+  const { onOpenOutbox, onOpenDashboard, onOpenSales, onOpenAdmin, onChangePassword, onSignOut } = props
 
   return (
     <PageHeader
@@ -121,6 +123,9 @@ export function FormHeader(props: Props) {
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
+              <DropdownMenuItem className={MENU_ITEM_CLASS} disabled={!online} onClick={onChangePassword}>
+                <KeyRoundIcon /> Wachtwoord wijzigen
+              </DropdownMenuItem>
               <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onSignOut}>
                 <LogOutIcon /> Uitloggen
               </DropdownMenuItem>

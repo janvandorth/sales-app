@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import type { Session } from "@supabase/supabase-js"
 import { formSchema, type FormInput, type FormValues } from "@shared/form-schema"
 import { Spinner } from "@/components/ui/spinner"
+import { ChangePasswordDialog } from "@/features/auth/change-password-dialog"
 import { useOnline } from "@/hooks/use-online"
 import { useProfile } from "@/hooks/use-profile"
 import { getErrorMessage } from "@/lib/errors"
@@ -37,6 +38,7 @@ export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }:
   const scanFill = useScanFill(form, userId)
   const [submitting, setSubmitting] = useState(false)
   const [outboxOpen, setOutboxOpen] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
   const photoInput = useRef<HTMLInputElement>(null)
   // A new rowId means a new form; used as key so the form's local state (e.g. manual address) resets too.
   const rowId = useWatch({ control: form.control, name: "rowId" })
@@ -102,6 +104,7 @@ export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }:
         onOpenDashboard={onOpenDashboard}
         onOpenSales={onOpenSales}
         onOpenAdmin={onOpenAdmin}
+        onChangePassword={() => setChangingPassword(true)}
         onSignOut={handleSignOut}
       />
       <input
@@ -128,6 +131,9 @@ export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }:
         </div>
       )}
 
+      {changingPassword && (
+        <ChangePasswordDialog email={session.user.email ?? ""} onClose={() => setChangingPassword(false)} />
+      )}
       <OutboxDialog
         open={outboxOpen}
         onOpenChange={setOutboxOpen}
