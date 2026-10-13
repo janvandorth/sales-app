@@ -9,6 +9,7 @@ import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import type { KpiRequest, KpiResponse } from "@shared/kpi"
 import { SCANS_BUCKET } from "@shared/storage"
+import { IS_TEST_DEPLOYMENT, TEST_DEPLOYMENT_HEADER } from "@/lib/deployment"
 import { ApiError, AuthError, NetworkError } from "@/lib/errors"
 import { supabase } from "@/lib/supabase"
 
@@ -18,7 +19,8 @@ async function invoke<T>(
   signal?: AbortSignal,
   isRetry = false,
 ): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T>(name, { body, signal })
+  const headers = IS_TEST_DEPLOYMENT ? { [TEST_DEPLOYMENT_HEADER]: "1" } : undefined
+  const { data, error } = await supabase.functions.invoke<T>(name, { body, signal, headers })
   if (!error) return data as T
 
   if (error instanceof FunctionsHttpError) {

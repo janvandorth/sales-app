@@ -174,7 +174,8 @@ as-is in code so they match the Google Sheet and the back office.
   dashboard/MCP; keep the file name's version equal to the applied version).
 - **Test deployment:** push to the `test` branch → Vercel preview at
   `https://sales-app-git-test-jans-projects-71e0b0fc.vercel.app` (shows a "TESTOMGEVING" banner). It uses the same
-  Supabase project; the backend recognises it by origin (`TEST_ORIGINS`) and stores its sales with `test = true`.
+  Supabase project. Its build sends an `x-test-deployment` header (and its branch URL is in `TEST_ORIGINS`), so the
+  backend stores its sales with `test = true` whatever URL it is opened on.
   Those are onboarded on test.zekerenmobiel.nl whatever `ONBOARDING_API_ENV` says, and never go to the Google Sheet.
   They do show in "Mijn verkopen" and the database, marked TEST.
   Update it with a merge (`git checkout test && git merge main && git push`): Vercel skips a commit it already
