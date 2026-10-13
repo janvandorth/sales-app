@@ -103,6 +103,80 @@ export async function getKpi(request: KpiRequest): Promise<KpiResponse> {
   return invoke<KpiResponse>("kpi", { ...request })
 }
 
+// --- Sales per day ------------------------------------------------------------------------------
+
+export type OnboardingStatus = "accepted" | "refused" | "failed" | "skipped"
+
+export type SubmittedSale = {
+  rowId: string
+  /** When the server received it (ISO timestamp). */
+  received: string
+  /** The date filled in on the form, yyyy-MM-dd. */
+  datum: string
+  wervernaam: string
+  wervernr: string
+  klantnummer: string
+  naam: string
+  straat: string
+  huisnummer: string
+  toevoeging: string
+  plaats: string
+  /** null: not sent to ZMAdmin yet. */
+  onboardingStatus: OnboardingStatus | null
+  /** ZMAdmin's explanation when it refused or failed. */
+  onboardingMessage: string | null
+}
+
+/**
+ * One page of the sales received between `from` and `to` (ISO timestamps), oldest first, with the total for the
+ * whole range. Row-level security decides whose: a recruiter gets their own, an admin everyone's.
+ */
+export async function listSales(
+  from: string,
+  to: string,
+  offset: number,
+  limit: number,
+): Promise<{ sales: SubmittedSale[]; total: number }> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoSales } = await import("@/features/sales-list/demo-sales")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const all = demoSales(from, DEMO_MODE === "admin")
+    return { sales: all.slice(offset, offset + limit), total: all.length }
+  }
+  const { data, count, error } = await supabase
+    .from("submissions")
+    .select(
+      "row_id, received, datum, wervernaam, wervernr, klantnummer, naam, straat, huisnummer, toevoeging, plaats, onboarding_status, onboarding_message:onboarding_response->>message",
+      { count: "exact" },
+    )
+    .gte("received", from)
+    .lt("received", to)
+    // row_id breaks ties, so a row never shows up on two pages.
+    .order("received")
+    .order("row_id")
+    .range(offset, offset + limit - 1)
+  if (error) {
+    if (!navigator.onLine) throw new NetworkError("Geen verbinding met de server")
+    throw new ApiError("De verkopen konden niet worden geladen", 500)
+  }
+  const sales = data.map((row) => ({
+    rowId: row.row_id,
+    received: row.received,
+    datum: row.datum,
+    wervernaam: row.wervernaam,
+    wervernr: row.wervernr,
+    klantnummer: row.klantnummer,
+    naam: row.naam,
+    straat: row.straat,
+    huisnummer: row.huisnummer,
+    toevoeging: row.toevoeging,
+    plaats: row.plaats,
+    onboardingStatus: row.onboarding_status,
+    onboardingMessage: row.onboarding_message ?? null,
+  }))
+  return { sales, total: count ?? sales.length }
+}
+
 // --- Admin ---------------------------------------------------------------------------------------
 
 export type AdminProfileInput = { wervernaam: string; wervernr: string; isAdmin: boolean }

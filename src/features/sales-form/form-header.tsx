@@ -1,4 +1,13 @@
-import { ChartColumnIcon, CameraIcon, CloudOffIcon, LogOutIcon, RefreshCwIcon, UserIcon, UsersIcon } from "lucide-react"
+import {
+  ChartColumnIcon,
+  CameraIcon,
+  ClipboardListIcon,
+  CloudOffIcon,
+  LogOutIcon,
+  RefreshCwIcon,
+  UserIcon,
+  UsersIcon,
+} from "lucide-react"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,6 +33,7 @@ type Props = {
   syncing: boolean
   onOpenOutbox: () => void
   onOpenDashboard: () => void
+  onOpenSales: () => void
   onOpenAdmin: () => void
   onSignOut: () => void
 }
@@ -34,7 +44,7 @@ const MENU_ITEM_CLASS = "min-h-12 gap-3 px-3 text-base [&_svg:not([class*='size-
 /** Header of the form page: camera scan, logo, offline/outbox status and the account menu. */
 export function FormHeader(props: Props) {
   const { profile, email, online, scanDisabled, onScan, outbox, syncing } = props
-  const { onOpenOutbox, onOpenDashboard, onOpenAdmin, onSignOut } = props
+  const { onOpenOutbox, onOpenDashboard, onOpenSales, onOpenAdmin, onSignOut } = props
 
   return (
     <PageHeader
@@ -99,6 +109,9 @@ export function FormHeader(props: Props) {
                 </>
               )}
               <DropdownMenuSeparator />
+              <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenSales}>
+                <ClipboardListIcon /> {profile?.isAdmin ? "Verkopen team" : "Mijn verkopen"}
+              </DropdownMenuItem>
               <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenDashboard}>
                 <ChartColumnIcon /> {profile?.isAdmin ? "Resultaten team" : "Mijn resultaten"}
               </DropdownMenuItem>

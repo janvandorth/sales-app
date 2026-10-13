@@ -20,10 +20,10 @@ import { ScanOverlay } from "./scan-overlay"
 import { useDraft } from "./use-draft"
 import { useScanFill } from "./use-scan-fill"
 
-type Props = { session: Session; onOpenDashboard: () => void; onOpenAdmin: () => void }
+type Props = { session: Session; onOpenDashboard: () => void; onOpenSales: () => void; onOpenAdmin: () => void }
 
 /** Main page after login: header, the sales form, the outbox dialog and the scan overlay. */
-export function FormPage({ session, onOpenDashboard, onOpenAdmin }: Props) {
+export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }: Props) {
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
@@ -51,8 +51,9 @@ export function FormPage({ session, onOpenDashboard, onOpenAdmin }: Props) {
     setSubmitting(true)
     try {
       const result = await outbox.submit(values)
-      if (result === "sent") toast.success("Formulier verstuurd")
-      else toast.info("Offline opgeslagen — wordt automatisch verstuurd zodra je weer online bent")
+      if (result === "sent") {
+        toast.success("Formulier verstuurd", { action: { label: "Bekijk mijn verkopen", onClick: onOpenSales } })
+      } else toast.info("Offline opgeslagen — wordt automatisch verstuurd zodra je weer online bent")
       await startNewForm()
     } catch (error) {
       toast.error(getErrorMessage(error, "Versturen mislukt"))
@@ -99,6 +100,7 @@ export function FormPage({ session, onOpenDashboard, onOpenAdmin }: Props) {
         syncing={outbox.syncing}
         onOpenOutbox={() => setOutboxOpen(true)}
         onOpenDashboard={onOpenDashboard}
+        onOpenSales={onOpenSales}
         onOpenAdmin={onOpenAdmin}
         onSignOut={handleSignOut}
       />
