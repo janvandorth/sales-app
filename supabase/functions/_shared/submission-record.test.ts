@@ -16,9 +16,13 @@ const values = formSchema.parse({
   plaats: "Amsterdam",
   landcode: "+31",
   telefoon: "612345678",
+  landcode2: "+31",
+  telefoon2: "",
   perPost: false,
   email: "pj@voorbeeld.nl",
   iban: "NL91ABNA0417164300",
+  ibanTnvZelfde: true,
+  ibanTnv: "",
   contractType: "Zakelijk",
   betaalperiode: "Jaar Acceptgiro",
   opmerkingen: "Graag bellen",
@@ -37,6 +41,26 @@ describe("toSubmissionRecord", () => {
     const record = toSubmissionRecord({ ...values, perPost: true, email: "" }, "user-a", recruiter, received)
     expect(record.telefoon).toBe("+31612345678")
     expect(record.email).toBe("Per post")
+  })
+
+  it("stores no second phone number or account holder by default", () => {
+    const record = toSubmissionRecord(values, "user-a", recruiter, received)
+    expect(record).toMatchObject({ telefoon2: "", iban_tnv: "" })
+  })
+
+  it("combines the second phone number and keeps a different account holder", () => {
+    const record = toSubmissionRecord(
+      { ...values, landcode2: "+32", telefoon2: "470123456", ibanTnvZelfde: false, ibanTnv: "M. de Vries" },
+      "user-a",
+      recruiter,
+      received,
+    )
+    expect(record).toMatchObject({ telefoon2: "+32470123456", iban_tnv: "M. de Vries" })
+  })
+
+  it("ignores a typed account holder while 'same as surname' is on", () => {
+    const record = toSubmissionRecord({ ...values, ibanTnv: "M. de Vries" }, "user-a", recruiter, received)
+    expect(record.iban_tnv).toBe("")
   })
 })
 

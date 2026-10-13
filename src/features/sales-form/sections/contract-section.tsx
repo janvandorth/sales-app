@@ -1,7 +1,8 @@
 import type { ReactNode } from "react"
-import { Controller } from "react-hook-form"
+import { Controller, useWatch } from "react-hook-form"
 import { BETAALPERIODE_OPTIONS, CONTRACT_TYPE_OPTIONS } from "@shared/form-schema"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import type { CheckState } from "@/hooks/use-debounced-check"
 import type { IbanResult } from "@/lib/api"
@@ -17,6 +18,7 @@ type Props = { form: SalesFormApi; iban: ReturnType<typeof useIbanCheck> }
 
 export function ContractSection({ form, iban }: Props) {
   const { control, setValue } = form
+  const ibanTnvZelfde = useWatch({ control, name: "ibanTnvZelfde" })
 
   return (
     <FormSection title="Contract">
@@ -34,6 +36,35 @@ export function ContractSection({ form, iban }: Props) {
         iban={iban.normalized}
         onPick={(code) => setValue("iban", `${iban.normalized.slice(0, 4)} ${code} `, { shouldDirty: true })}
       />
+      <Controller
+        control={control}
+        name="ibanTnvZelfde"
+        render={({ field }) => (
+          <Field orientation="horizontal" data-field="ibanTnvZelfde">
+            <FieldContent>
+              <FieldLabel htmlFor="ibanTnvZelfde">T.n.v. zelfde als achternaam</FieldLabel>
+            </FieldContent>
+            <Switch
+              id="ibanTnvZelfde"
+              checked={field.value}
+              onCheckedChange={(checked) => {
+                field.onChange(checked)
+                if (checked) setValue("ibanTnv", "", { shouldValidate: true })
+              }}
+            />
+          </Field>
+        )}
+      />
+      {!ibanTnvZelfde && (
+        <TextField
+          control={control}
+          name="ibanTnv"
+          label="T.n.v."
+          placeholder="Bijv. M. de Vries"
+          autoComplete="off"
+          description="Op wiens naam de rekening staat"
+        />
+      )}
       <ChoiceField
         control={control}
         name="contractType"

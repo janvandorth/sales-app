@@ -42,7 +42,9 @@ Regels:
 - naam: voorletters met punten + achternaam, bijv. "P.J. Jansen" of "A. van der Berg".
 - postcode: "1234AB" zonder spatie. huisnummer: alleen cijfers; letters of toevoegingen gaan naar toevoeging.
 - landcode: internationaal kengetal met +, bijv. "+31". telefoon: alleen cijfers zonder landcode en zonder voorloop-0 (06-12345678 wordt "612345678").
+- Tweede telefoonnummer: het formulier heeft vakjes voor maar één nummer. Staat er een tweede nummer (bijv. naast, boven of onder de vakjes, in de kantlijn of bij opmerkingen, vaak met "of", "/", "vast" of "mobiel" ervoor), dan gaat het nummer in de vakjes naar telefoon en het tweede naar telefoon2, met landcode2 op dezelfde manier als landcode. Is het geschreven nummer een verbetering van het nummer in de vakjes (vakjes doorgestreept of onvolledig), dan is het géén tweede nummer: het is dan telefoon en telefoon2 blijft leeg. Geen tweede nummer: telefoon2 en landcode2 leeg.
 - iban: zonder spaties, hoofdletters.
+- ibanTnv: wat er staat bij "ten name van" / "t.n.v." (de rekeninghouder), zoals geschreven, bijv. "M. de Vries". Laat leeg als het veld leeg is of als er alleen dezelfde naam staat als de klant zelf (dezelfde achternaam, eventueel met dezelfde voorletters).
 - geslacht, contractType en betaalperiode: kies exact een van de toegestane waarden als die duidelijk is aangevinkt of vermeld.`
 
 // Structured output schema for Claude, derived from the shared definition (minus the $schema marker).
@@ -61,8 +63,11 @@ const MOCK_EXTRACTION: Extraction = {
   plaats: "Amsterdam",
   landcode: "+31",
   telefoon: "612345678",
+  landcode2: "",
+  telefoon2: "",
   email: "m.devries@voorbeeld.nl",
   iban: "NL91ABNA0417164300",
+  ibanTnv: "",
   contractType: "Service",
   betaalperiode: "Maand Machtiging",
 }
@@ -142,9 +147,11 @@ function normalize(extraction: Extraction): ExtractedFields {
   const cleaned: Extraction = {
     ...extraction,
     huisnummer: extraction.huisnummer.replace(/\D/g, ""),
-    telefoon: extraction.telefoon.replace(/\D/g, "").replace(/^0+/, ""),
+    telefoon: cleanPhone(extraction.telefoon),
+    telefoon2: cleanPhone(extraction.telefoon2),
+    landcode2: cleanLandcode(extraction.landcode2),
     iban: normalizeIban(extraction.iban),
-    landcode: /^\+\d{1,4}$/.test(extraction.landcode.trim()) ? extraction.landcode.trim() : "",
+    landcode: cleanLandcode(extraction.landcode),
     datum: isRealDate(extraction.datum.trim()) ? extraction.datum.trim() : "",
   }
   const fields: Record<string, string> = {}
@@ -153,6 +160,14 @@ function normalize(extraction: Extraction): ExtractedFields {
     if (value) fields[key] = value
   }
   return fields as ExtractedFields
+}
+
+function cleanPhone(value: string): string {
+  return value.replace(/\D/g, "").replace(/^0+/, "")
+}
+
+function cleanLandcode(value: string): string {
+  return /^\+\d{1,4}$/.test(value.trim()) ? value.trim() : ""
 }
 
 /** Today's date in the Netherlands, yyyy-MM-dd: the edge function runs in UTC. */
