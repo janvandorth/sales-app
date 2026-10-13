@@ -177,6 +177,8 @@ as-is in code so they match the Google Sheet and the back office.
   Supabase project; the backend recognises it by origin (`TEST_ORIGINS`) and stores its sales with `test = true`.
   Those are onboarded on test.zekerenmobiel.nl whatever `ONBOARDING_API_ENV` says, and never go to the Google Sheet.
   They do show in "Mijn verkopen" and the database, marked TEST.
+  Update it with a merge (`git checkout test && git merge main && git push`): Vercel skips a commit it already
+  built for `main`, so pushing `main` itself to `test` deploys nothing.
 - **Auth URLs** (Site URL, redirect URLs) and **email templates** are configured in the Supabase dashboard;
   `supabase/config.toml` and `supabase/templates/` mirror them.
 
