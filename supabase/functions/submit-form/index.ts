@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireUser } from "../_shared/auth.ts"
-import { formSchema } from "../_shared/form-schema.ts"
+import { parseSubmittedForm } from "../_shared/form-schema.ts"
 import { appendSheetRow, isSheetsConfigured } from "../_shared/google-sheets.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { isOnboardingConfigured, sendToOnboarding } from "../_shared/onboarding.ts"
@@ -11,7 +11,7 @@ import { isTestRequest } from "../_shared/test-request.ts"
 serve(async (req) => {
   const { user } = await requireUser(req)
 
-  const parsed = formSchema.safeParse(await req.json())
+  const parsed = parseSubmittedForm(await req.json())
   if (!parsed.success) {
     return json({ error: "Formulier bevat fouten", issues: parsed.error.issues }, 400)
   }

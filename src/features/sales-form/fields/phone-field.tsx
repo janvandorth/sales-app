@@ -1,24 +1,39 @@
+import type { ReactNode } from "react"
 import { Controller, useFormState } from "react-hook-form"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import type { SalesFormControl } from "../form-types"
 import { CountryCodePicker } from "./country-code-picker"
 
+const NAMES = {
+  first: { landcode: "landcode", telefoon: "telefoon", label: "Telefoonnummer" },
+  second: { landcode: "landcode2", telefoon: "telefoon2", label: "Tweede telefoonnummer" },
+} as const
+
+type Props = {
+  control: SalesFormControl
+  which?: keyof typeof NAMES
+  /** Rendered next to the number, e.g. a remove button. */
+  action?: ReactNode
+}
+
 /** Country code picker plus the number without leading 0; stored as separate fields, combined on the server. */
-export function PhoneField({ control }: { control: SalesFormControl }) {
-  const { errors } = useFormState({ control, name: "telefoon" })
+export function PhoneField({ control, which = "first", action }: Props) {
+  const { landcode, telefoon, label } = NAMES[which]
+  const { errors } = useFormState({ control, name: telefoon })
+  const error = errors[telefoon]
 
   return (
-    <Field data-field="telefoon" data-invalid={Boolean(errors.telefoon)}>
-      <FieldLabel htmlFor="telefoon">Telefoonnummer</FieldLabel>
+    <Field data-field={telefoon} data-invalid={Boolean(error)}>
+      <FieldLabel htmlFor={telefoon}>{label}</FieldLabel>
       <div className="flex gap-2">
         <Controller
           control={control}
-          name="landcode"
+          name={landcode}
           render={({ field, fieldState }) => (
-            <div data-field="landcode" className="rounded-md">
+            <div data-field={landcode} className="rounded-md">
               <CountryCodePicker
-                id="landcode"
+                id={landcode}
                 value={field.value}
                 onChange={field.onChange}
                 invalid={fieldState.invalid}
@@ -28,10 +43,10 @@ export function PhoneField({ control }: { control: SalesFormControl }) {
         />
         <Controller
           control={control}
-          name="telefoon"
+          name={telefoon}
           render={({ field, fieldState }) => (
             <Input
-              id="telefoon"
+              id={telefoon}
               type="tel"
               inputMode="numeric"
               placeholder="612345678"
@@ -41,9 +56,10 @@ export function PhoneField({ control }: { control: SalesFormControl }) {
             />
           )}
         />
+        {action}
       </div>
-      {errors.telefoon ? (
-        <FieldError errors={[errors.telefoon]} />
+      {error ? (
+        <FieldError errors={[error]} />
       ) : (
         <FieldDescription>Zonder 0 of landcode, alleen cijfers</FieldDescription>
       )}

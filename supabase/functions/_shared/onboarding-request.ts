@@ -15,12 +15,14 @@ export type OnboardingForm = {
   Straat: string
   Plaats: string
   Telefoon: string
+  Telefoon2: string
   Email: string
   Wervernr: string
   Wervernaam: string
   ContractType: string
   Betaalperiode: string
   IBAN: string
+  IBANtnv: string
   Opmerkingen: string
   Datum: string
 }
@@ -90,6 +92,7 @@ export function toOnboardingRequest(record: SubmissionRecord): OnboardingRequest
           Straat: record.straat,
           Plaats: record.plaats,
           Telefoon: toOnboardingPhone(record.telefoon),
+          Telefoon2: toOnboardingPhone(record.telefoon2),
           // "Per post" is how the sheet marks a customer without email; the endpoint rejects it as an address.
           Email: record.email === PER_POST_EMAIL ? "" : record.email,
           Wervernr: record.wervernr,
@@ -97,6 +100,8 @@ export function toOnboardingRequest(record: SubmissionRecord): OnboardingRequest
           ContractType: CONTRACT_TYPE_CODES[record.contract_type] ?? "",
           Betaalperiode: BETAALPERIODE_CODES[record.betaalperiode] ?? "",
           IBAN: record.iban,
+          // Empty: ZMAdmin uses the customer's surname as the account holder.
+          IBANtnv: record.iban_tnv,
           Opmerkingen: record.opmerkingen,
           Datum: record.datum,
         },

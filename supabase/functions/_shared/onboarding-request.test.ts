@@ -19,8 +19,10 @@ const record: SubmissionRecord = {
   straat: "Dam",
   plaats: "Amsterdam",
   telefoon: "+31612345678",
+  telefoon2: "",
   email: "pj@voorbeeld.nl",
   iban: "NL91ABNA0417164300",
+  iban_tnv: "",
   contract_type: "Service",
   betaalperiode: "Kwartaal Machtiging",
   opmerkingen: "Graag bellen",
@@ -41,12 +43,14 @@ describe("toOnboardingRequest", () => {
       Straat: "Dam",
       Plaats: "Amsterdam",
       Telefoon: "0612345678",
+      Telefoon2: "",
       Email: "pj@voorbeeld.nl",
       Wervernr: "W0001",
       Wervernaam: "Anna",
       ContractType: "S",
       Betaalperiode: "BM", // ZMAdmin's quarterly code; the sheet says "KM"
       IBAN: "NL91ABNA0417164300",
+      IBANtnv: "", // ZMAdmin then uses the surname
       Opmerkingen: "Graag bellen",
       Datum: "2026-09-30",
     })
@@ -54,6 +58,12 @@ describe("toOnboardingRequest", () => {
 
   it("sends no email for a customer who gets their mail by post", () => {
     expect(toOnboardingRequest({ ...record, email: "Per post" }).Entry.AnswersJson.page1.Email).toBe("")
+  })
+
+  it("sends the second phone number and the account holder", () => {
+    const page = toOnboardingRequest({ ...record, telefoon2: "+31201234567", iban_tnv: "M. de Vries" }).Entry
+      .AnswersJson.page1
+    expect(page).toMatchObject({ Telefoon2: "0201234567", IBANtnv: "M. de Vries" })
   })
 })
 

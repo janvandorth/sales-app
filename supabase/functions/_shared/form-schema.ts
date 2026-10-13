@@ -15,6 +15,10 @@ export const BETAALPERIODE_OPTIONS = [
 
 export const PER_POST_EMAIL = "Per post"
 
+export const PHONE_REGEX = /^[1-9]\d{5,13}$/
+const PHONE_MESSAGE = "Alleen cijfers, zonder 0 of landcode"
+const LANDCODE_REGEX = /^\+\d{1,4}$/
+
 export const POSTCODE_REGEX = /^[1-9]\d{3}\s?[A-Za-z]{2}$/
 
 export function normalizePostcode(value: string): string {
@@ -69,15 +73,21 @@ export const formSchema = z
     toevoeging: z.string().trim().max(10, "Maximaal 10 tekens"),
     straat: z.string().trim().min(1, "Vul de straat in"),
     plaats: z.string().trim().min(1, "Vul de plaats in"),
-    landcode: z.string().regex(/^\+\d{1,4}$/, "Kies een landcode"),
-    telefoon: z
+    landcode: z.string().regex(LANDCODE_REGEX, "Kies een landcode"),
+    telefoon: z.string().trim().regex(PHONE_REGEX, PHONE_MESSAGE),
+    // Optional second number; "" means none.
+    landcode2: z.string().regex(LANDCODE_REGEX, "Kies een landcode"),
+    telefoon2: z
       .string()
       .trim()
-      .regex(/^[1-9]\d{5,13}$/, "Alleen cijfers, zonder 0 of landcode"),
+      .refine((value) => value === "" || PHONE_REGEX.test(value), PHONE_MESSAGE),
     perPost: z.boolean(),
     email: z.string().trim(),
     // Required, but an invalid IBAN may still be submitted; the app warns the user when online.
     iban: z.string().transform(normalizeIban).pipe(z.string().min(1, "Vul het IBAN in")),
+    // "Ten name van": the account holder. Same as the customer's surname unless switched off.
+    ibanTnvZelfde: z.boolean(),
+    ibanTnv: z.string().trim().max(200, "Maximaal 200 tekens"),
     contractType: z
       .enum([...CONTRACT_TYPE_OPTIONS, ""], { error: "Kies een contracttype" })
       .transform(requireChoice("Kies een contracttype")),
@@ -92,8 +102,30 @@ export const formSchema = z
     // Also check while other fields are still invalid, so every error shows at once.
     when: ({ value }) => typeof value === "object" && value !== null && "perPost" in value && "email" in value,
   })
+  .refine((values) => values.ibanTnvZelfde || values.ibanTnv !== "", {
+    path: ["ibanTnv"],
+    message: "Vul in op wiens naam de rekening staat",
+    when: ({ value }) => typeof value === "object" && value !== null && "ibanTnvZelfde" in value && "ibanTnv" in value,
+  })
 
 export type FormInput = z.input<typeof formSchema>
+
+/**
+ * Fields added after the first release, with their empty values. The server fills them in when missing, so a
+ * sale from an app that has not updated yet (or waited in its offline outbox) is still accepted.
+ */
+export const ADDED_FIELD_DEFAULTS = {
+  landcode2: "+31",
+  telefoon2: "",
+  ibanTnvZelfde: true,
+  ibanTnv: "",
+} satisfies Partial<FormInput>
+
+/** Parses a submitted form body, filling in fields an older app version does not send. */
+export function parseSubmittedForm(body: unknown) {
+  const withDefaults = typeof body === "object" && body !== null ? { ...ADDED_FIELD_DEFAULTS, ...body } : body
+  return formSchema.safeParse(withDefaults)
+}
 export type FormValues = z.output<typeof formSchema>
 
 /**
@@ -114,8 +146,11 @@ export const extractionSchema = z.strictObject({
   plaats: z.string(),
   landcode: z.string(),
   telefoon: z.string(),
+  landcode2: z.string(),
+  telefoon2: z.string(),
   email: z.string(),
   iban: z.string(),
+  ibanTnv: z.string(),
   contractType: z.enum([...CONTRACT_TYPE_OPTIONS, ""]),
   betaalperiode: z.enum([...BETAALPERIODE_OPTIONS, ""]),
 })

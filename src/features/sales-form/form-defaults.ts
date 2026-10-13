@@ -1,4 +1,4 @@
-import type { FormInput } from "@shared/form-schema"
+import { ADDED_FIELD_DEFAULTS, type FormInput } from "@shared/form-schema"
 
 function today(): string {
   const now = new Date()
@@ -28,5 +28,6 @@ export function createEmptyForm(): FormInput {
     contractType: "",
     betaalperiode: "",
     opmerkingen: "",
+    ...ADDED_FIELD_DEFAULTS,
   }
 }

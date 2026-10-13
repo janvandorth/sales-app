@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import type { FormInput } from "@shared/form-schema"
+import { createEmptyForm } from "./form-defaults"
 import type { SalesFormApi } from "./form-types"
 import { loadDraft, saveDraft } from "./draft-store"
 
@@ -16,7 +17,8 @@ export function useDraft(form: SalesFormApi, userId: string) {
     let cancelled = false
     void loadDraft(userId).then((draft) => {
       if (cancelled) return
-      if (draft) form.reset(draft)
+      // Defaults first, so a draft saved before a field was added still has every field.
+      if (draft) form.reset({ ...createEmptyForm(), ...draft })
       setReady(true)
     })
     return () => {

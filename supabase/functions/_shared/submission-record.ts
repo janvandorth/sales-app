@@ -19,8 +19,12 @@ export type SubmissionRecord = {
   straat: string
   plaats: string
   telefoon: string
+  /** Second phone number in the same form as telefoon, "" when none. */
+  telefoon2: string
   email: string
   iban: string
+  /** "Ten name van" when it differs from the customer; "" means the customer's own surname. */
+  iban_tnv: string
   contract_type: string
   betaalperiode: string
   opmerkingen: string
@@ -58,8 +62,10 @@ export function toSubmissionRecord(
     straat: values.straat,
     plaats: values.plaats,
     telefoon: `${values.landcode}${values.telefoon}`,
+    telefoon2: values.telefoon2 ? `${values.landcode2}${values.telefoon2}` : "",
     email: values.perPost ? PER_POST_EMAIL : values.email,
     iban: values.iban,
+    iban_tnv: values.ibanTnvZelfde ? "" : values.ibanTnv,
     contract_type: values.contractType,
     betaalperiode: values.betaalperiode,
     opmerkingen: values.opmerkingen,

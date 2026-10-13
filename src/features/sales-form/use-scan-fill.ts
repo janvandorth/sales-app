@@ -12,7 +12,14 @@ const TYPE_CHAR_MS = 22
 const MAX_TYPE_FIELD_MS = 450
 const PICKER_STEP_MS = 120
 // A date input only accepts a complete date, so it cannot be typed character by character either.
-const PICKER_FIELDS = new Set<ExtractableField>(["datum", "geslacht", "landcode", "contractType", "betaalperiode"])
+const PICKER_FIELDS = new Set<ExtractableField>([
+  "datum",
+  "geslacht",
+  "landcode",
+  "landcode2",
+  "contractType",
+  "betaalperiode",
+])
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -51,6 +58,7 @@ export function useScanFill(form: SalesFormApi, userId: string) {
         value = normalizeNaam(value)
       }
       if (name === "email") form.setValue("perPost", false)
+      if (name === "ibanTnv") form.setValue("ibanTnvZelfde", false)
       filled.push(name)
       highlight(name)
 

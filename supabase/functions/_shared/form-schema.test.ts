@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { formSchema, isValidIbanChecksum, normalizeIban, normalizePostcode, type FormInput } from "./form-schema"
+import {
+  formSchema,
+  isValidIbanChecksum,
+  parseSubmittedForm,
+  normalizeIban,
+  normalizePostcode,
+  type FormInput,
+} from "./form-schema"
 
 const validForm: FormInput = {
   rowId: "0b5a1a6e-8a2f-4f3c-9d7e-2d1f4c3b2a10",
@@ -15,9 +22,13 @@ const validForm: FormInput = {
   plaats: "Amsterdam",
   landcode: "+31",
   telefoon: "612345678",
+  landcode2: "+31",
+  telefoon2: "",
   perPost: false,
   email: "m.devries@voorbeeld.nl",
   iban: "nl91 abna 0417 1643 00",
+  ibanTnvZelfde: true,
+  ibanTnv: "",
   contractType: "Service",
   betaalperiode: "Maand Machtiging",
   opmerkingen: "",
@@ -50,6 +61,22 @@ describe("formSchema", () => {
       "contractType",
       "betaalperiode",
     ])
+  })
+
+  it("accepts a form from an older app version without the second phone number and account holder", () => {
+    const { landcode2: _l, telefoon2: _t, ibanTnvZelfde: _z, ibanTnv: _n, ...older } = validForm
+    expect(formSchema.safeParse(older).success).toBe(false)
+    expect(parseSubmittedForm(older).data).toMatchObject({ telefoon2: "", ibanTnvZelfde: true, ibanTnv: "" })
+  })
+
+  it("checks the second phone number only when one is filled in", () => {
+    expect(issuesFor({ telefoon2: "0612345678" })).toEqual(["telefoon2"])
+    expect(issuesFor({ telefoon2: "622222222" })).toEqual([])
+  })
+
+  it("requires the account holder once 'same as surname' is switched off", () => {
+    expect(issuesFor({ ibanTnvZelfde: false, ibanTnv: " " })).toEqual(["ibanTnv"])
+    expect(issuesFor({ ibanTnvZelfde: false, ibanTnv: "M. de Vries" })).toEqual([])
   })
 
   it("requires a valid email unless the customer wants post", () => {
