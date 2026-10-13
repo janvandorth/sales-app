@@ -37,6 +37,7 @@ Lengtecontrole (tel je tekens na):
 - Kom je bij een Nederlands IBAN of telefoonnummer op meer tekens uit, dan heb je waarschijnlijk een scheidingslijn als 1 gelezen of een doorgehaalde/verbeterde waarde meegeteld; kijk dan opnieuw. Kom je op minder uit, dan heb je vrijwel zeker een 1 (kort streepje) gemist; zoek die en neem hem op. Dit geldt ook voor een waarde die boven of naast de vakjes is geschreven.
 
 Regels:
+- datum: de datum van het contract zoals die op het formulier staat, als JJJJ-MM-DD (bijv. "13-10-26" of "13 okt" wordt "2026-10-13"). Data staan in Nederlandse volgorde: dag, maand, jaar. Ontbreekt het jaar, neem dan het jaar van vandaag (zie de datum in het verzoek).
 - Neem alleen over wat op het formulier staat. Laat een veld leeg ("") als het leeg, onleesbaar of niet aanwezig is; verzin niets.
 - naam: voorletters met punten + achternaam, bijv. "P.J. Jansen" of "A. van der Berg".
 - postcode: "1234AB" zonder spatie. huisnummer: alleen cijfers; letters of toevoegingen gaan naar toevoeging.
@@ -49,6 +50,7 @@ const { $schema: _, ...EXTRACTION_JSON_SCHEMA } = z.toJSONSchema(extractionSchem
 
 // Returned when ANTHROPIC_API_KEY is not configured, so the scan flow can be demonstrated end to end.
 const MOCK_EXTRACTION: Extraction = {
+  datum: "",
   klantnummer: "100234",
   geslacht: "Vrouw",
   naam: "M.A. de Vries",
@@ -114,7 +116,7 @@ async function readWithClaude(supabase: SupabaseClient, path: string, apiKey: st
         role: "user",
         content: [
           { type: "image", source: { type: "base64", media_type: mediaType, data } },
-          { type: "text", text: "Lees dit formulier uit." },
+          { type: "text", text: `Lees dit formulier uit. Vandaag is het ${amsterdamToday()}.` },
         ],
       },
     ],
@@ -132,7 +134,7 @@ async function readWithClaude(supabase: SupabaseClient, path: string, apiKey: st
 
 async function mockRead(): Promise<Extraction> {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
-  return extractionSchema.parse(MOCK_EXTRACTION)
+  return extractionSchema.parse({ ...MOCK_EXTRACTION, datum: amsterdamToday() })
 }
 
 /** Cleans up what was read into the shape the form expects, and drops empty (not found) values. */
@@ -143,6 +145,7 @@ function normalize(extraction: Extraction): ExtractedFields {
     telefoon: extraction.telefoon.replace(/\D/g, "").replace(/^0+/, ""),
     iban: normalizeIban(extraction.iban),
     landcode: /^\+\d{1,4}$/.test(extraction.landcode.trim()) ? extraction.landcode.trim() : "",
+    datum: isRealDate(extraction.datum.trim()) ? extraction.datum.trim() : "",
   }
   const fields: Record<string, string> = {}
   for (const key of EXTRACTABLE_FIELDS) {
@@ -150,6 +153,18 @@ function normalize(extraction: Extraction): ExtractedFields {
     if (value) fields[key] = value
   }
   return fields as ExtractedFields
+}
+
+/** Today's date in the Netherlands, yyyy-MM-dd: the edge function runs in UTC. */
+function amsterdamToday(): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Amsterdam" }).format(new Date())
+}
+
+/** yyyy-MM-dd that exists on the calendar (no 31 June), so the form's date field accepts it. */
+function isRealDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 
 function encodeBase64(bytes: Uint8Array): string {

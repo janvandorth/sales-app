@@ -11,7 +11,8 @@ import { prepareScanImage } from "./scan-image"
 const TYPE_CHAR_MS = 22
 const MAX_TYPE_FIELD_MS = 450
 const PICKER_STEP_MS = 120
-const PICKER_FIELDS = new Set<ExtractableField>(["geslacht", "landcode", "contractType", "betaalperiode"])
+// A date input only accepts a complete date, so it cannot be typed character by character either.
+const PICKER_FIELDS = new Set<ExtractableField>(["datum", "geslacht", "landcode", "contractType", "betaalperiode"])
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 

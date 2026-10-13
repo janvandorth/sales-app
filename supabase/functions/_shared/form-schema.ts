@@ -103,6 +103,7 @@ export type FormValues = z.output<typeof formSchema>
  * Opmerkingen is digital-only, so it is not part of the paper form.
  */
 export const extractionSchema = z.strictObject({
+  datum: z.string(),
   klantnummer: z.string(),
   geslacht: z.enum([...GESLACHT_OPTIONS, ""]),
   naam: z.string(),
