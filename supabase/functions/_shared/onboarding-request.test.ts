@@ -24,6 +24,7 @@ const record: SubmissionRecord = {
   contract_type: "Service",
   betaalperiode: "Kwartaal Machtiging",
   opmerkingen: "Graag bellen",
+  test: false,
 }
 
 describe("toOnboardingRequest", () => {

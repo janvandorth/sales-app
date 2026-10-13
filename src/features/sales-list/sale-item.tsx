@@ -7,7 +7,7 @@ import { formatTime } from "./days"
 
 type Props = {
   sale: Pick<SubmittedSale, "naam" | "klantnummer" | "datum" | "straat" | "huisnummer" | "toevoeging" | "plaats"> &
-    Partial<Pick<SubmittedSale, "onboardingMessage">>
+    Partial<Pick<SubmittedSale, "onboardingMessage" | "test">>
   /** The day it was sent on; the form's own date is pointed out when it differs. */
   day: string
   /** Received time; absent for a form still in the outbox. */
@@ -33,6 +33,7 @@ export function SaleItem({ sale, day, received, status }: Props) {
       </span>
       <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
         <StatusBadge status={status} />
+        {sale.test && <Badge className="bg-amber-500 text-black">TEST</Badge>}
         <Badge
           variant="outline"
           className={cn(

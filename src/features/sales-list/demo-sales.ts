@@ -42,6 +42,7 @@ export function demoSales(from: string, team: boolean): SubmittedSale[] {
           plaats,
           onboardingStatus: status,
           onboardingMessage: status === "refused" ? "IBAN is ongeldig" : status === "failed" ? "Interne fout" : null,
+          test: false,
         }
       }),
     )

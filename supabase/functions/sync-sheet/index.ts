@@ -8,6 +8,7 @@ const BATCH_SIZE = 50
 
 /**
  * Appends stored submissions that are not in the Google Sheet yet (sheet_synced_at is null), oldest first.
+ * Test sales never go to the sheet.
  * Called on a schedule (pg_cron) with the CRON_SECRET header; app users cannot call it.
  */
 serve(async (req) => {
@@ -19,6 +20,7 @@ serve(async (req) => {
     .from("submissions")
     .select("*")
     .is("sheet_synced_at", null)
+    .eq("test", false)
     .order("received")
     .limit(BATCH_SIZE)
   if (error) throw error

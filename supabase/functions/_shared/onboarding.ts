@@ -27,12 +27,12 @@ type OnboardingResponse = { correlationId?: string; regNr?: string; message?: st
 
 /** Sends one submission and stores the outcome on it. Throws when the outcome is unknown (retry later). */
 export async function sendToOnboarding(admin: SupabaseClient, record: SubmissionRecord): Promise<OnboardingStatus> {
-  const response = await fetch(onboardingUrl(), {
+  const response = await fetch(onboardingUrl(record.test), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      "X-API-Key": requireEnv("ONBOARDING_API_KEY"),
+      "X-API-Key": onboardingKey(record.test),
     },
     body: JSON.stringify(toOnboardingRequest(record)),
     signal: AbortSignal.timeout(15_000),
@@ -56,6 +56,11 @@ export async function sendToOnboarding(admin: SupabaseClient, record: Submission
     .eq("row_id", record.row_id)
   if (error) throw error
   return status
+}
+
+/** A test sale may need TEST's key when ONBOARDING_API_KEY holds the production key. */
+function onboardingKey(test: boolean): string {
+  return (test && optionalEnv("ONBOARDING_TEST_API_KEY")) || requireEnv("ONBOARDING_API_KEY")
 }
 
 function classify(httpStatus: number, body: OnboardingResponse | null): OnboardingStatus | null {

@@ -11,6 +11,9 @@ import { SalesListPage } from "@/features/sales-list/sales-list-page"
 import { useProfile } from "@/hooks/use-profile"
 import { DEMO_MODE } from "@/lib/api"
 
+/** The `test` branch on Vercel; the backend recognises it by origin (TEST_ORIGINS) and onboards on TEST. */
+const IS_TEST_DEPLOYMENT = import.meta.env.VITE_VERCEL_GIT_COMMIT_REF === "test"
+
 export default function App() {
   const { session, loading, needsPassword, isInvite, passwordSet } = useSession()
   const [view, setView] = useState<"form" | "dashboard" | "sales" | "admin">("form")
@@ -54,6 +57,11 @@ export default function App() {
 
   return (
     <>
+      {IS_TEST_DEPLOYMENT && (
+        <div className="bg-amber-500 px-4 py-1 text-center text-sm font-medium text-black">
+          TESTOMGEVING · verkopen gaan naar de testomgeving van ZMAdmin
+        </div>
+      )}
       {content()}
       <Toaster position="top-center" richColors />
     </>

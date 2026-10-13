@@ -125,6 +125,8 @@ export type SubmittedSale = {
   onboardingStatus: OnboardingStatus | null
   /** ZMAdmin's explanation when it refused or failed. */
   onboardingMessage: string | null
+  /** Sent from the test deployment: onboarded on ZMAdmin's TEST, not in the sheet. */
+  test: boolean
 }
 
 /**
@@ -146,7 +148,7 @@ export async function listSales(
   const { data, count, error } = await supabase
     .from("submissions")
     .select(
-      "row_id, received, datum, wervernaam, wervernr, klantnummer, naam, straat, huisnummer, toevoeging, plaats, onboarding_status, onboarding_message:onboarding_response->>message",
+      "row_id, received, datum, wervernaam, wervernr, klantnummer, naam, straat, huisnummer, toevoeging, plaats, onboarding_status, onboarding_message:onboarding_response->>message, test",
       { count: "exact" },
     )
     .gte("received", from)
@@ -173,6 +175,7 @@ export async function listSales(
     plaats: row.plaats,
     onboardingStatus: row.onboarding_status,
     onboardingMessage: row.onboarding_message ?? null,
+    test: row.test,
   }))
   return { sales, total: count ?? sales.length }
 }

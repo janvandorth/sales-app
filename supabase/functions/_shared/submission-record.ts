@@ -24,6 +24,8 @@ export type SubmissionRecord = {
   contract_type: string
   betaalperiode: string
   opmerkingen: string
+  /** Submitted from the test deployment: onboarded on TEST and kept out of the Google Sheet. */
+  test: boolean
 }
 
 export type Recruiter = { wervernaam: string; wervernr: string }
@@ -37,6 +39,7 @@ export function toSubmissionRecord(
   userId: string,
   recruiter: Recruiter,
   received: Date,
+  test = false,
 ): SubmissionRecord {
   return {
     row_id: values.rowId,
@@ -60,6 +63,7 @@ export function toSubmissionRecord(
     contract_type: values.contractType,
     betaalperiode: values.betaalperiode,
     opmerkingen: values.opmerkingen,
+    test,
   }
 }
 
