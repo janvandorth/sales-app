@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { supabase } from "@/lib/supabase"
 
-const MIN_LENGTH = 8
+export const MIN_PASSWORD_LENGTH = 8
 
 export function SetPasswordPage({ email, isInvite, onDone }: { email: string; isInvite: boolean; onDone: () => void }) {
   const [password, setPassword] = useState("")
@@ -17,7 +17,7 @@ export function SetPasswordPage({ email, isInvite, onDone }: { email: string; is
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (password.length < MIN_LENGTH) return setError(`Gebruik minimaal ${MIN_LENGTH} tekens`)
+    if (password.length < MIN_PASSWORD_LENGTH) return setError(`Gebruik minimaal ${MIN_PASSWORD_LENGTH} tekens`)
     if (password !== confirm) return setError("De wachtwoorden zijn niet gelijk")
 
     setSubmitting(true)
@@ -53,7 +53,7 @@ export function SetPasswordPage({ email, isInvite, onDone }: { email: string; is
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
-                <FieldDescription>Minimaal {MIN_LENGTH} tekens</FieldDescription>
+                <FieldDescription>Minimaal {MIN_PASSWORD_LENGTH} tekens</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="confirm-password">Herhaal wachtwoord</FieldLabel>
