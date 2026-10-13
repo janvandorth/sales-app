@@ -6,7 +6,7 @@ import { HttpError, json, serve } from "../_shared/http.ts"
 import { isOnboardingConfigured, sendToOnboarding } from "../_shared/onboarding.ts"
 import { toSheetRow, toSubmissionRecord } from "../_shared/submission-record.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
-import { isTestOrigin } from "../_shared/test-origin.ts"
+import { isTestRequest } from "../_shared/test-request.ts"
 
 serve(async (req) => {
   const { user } = await requireUser(req)
@@ -25,7 +25,7 @@ serve(async (req) => {
     .single()
   if (profileError || !recruiter) throw new HttpError(403, "Geen wervers-profiel gevonden")
 
-  const record = toSubmissionRecord(parsed.data, user.id, recruiter, new Date(), isTestOrigin(req))
+  const record = toSubmissionRecord(parsed.data, user.id, recruiter, new Date(), isTestRequest(req))
 
   // row_id is generated on the device, so retries from the offline outbox are idempotent.
   const { data: inserted, error: insertError } = await admin

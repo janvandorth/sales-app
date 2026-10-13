@@ -1,0 +1,7 @@
+/**
+ * The `test` branch on Vercel. Its requests carry TEST_DEPLOYMENT_HEADER, so the backend onboards its sales on
+ * ZMAdmin's TEST whichever URL the build was opened on (branch URL or a per-deployment URL).
+ */
+export const IS_TEST_DEPLOYMENT = import.meta.env.VITE_VERCEL_GIT_COMMIT_REF === "test"
+
+export const TEST_DEPLOYMENT_HEADER = "x-test-deployment"

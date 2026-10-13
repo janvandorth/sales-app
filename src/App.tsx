@@ -10,9 +10,7 @@ import { FormPage } from "@/features/sales-form/form-page"
 import { SalesListPage } from "@/features/sales-list/sales-list-page"
 import { useProfile } from "@/hooks/use-profile"
 import { DEMO_MODE } from "@/lib/api"
-
-/** The `test` branch on Vercel; the backend recognises it by origin (TEST_ORIGINS) and onboards on TEST. */
-const IS_TEST_DEPLOYMENT = import.meta.env.VITE_VERCEL_GIT_COMMIT_REF === "test"
+import { IS_TEST_DEPLOYMENT } from "@/lib/deployment"
 
 export default function App() {
   const { session, loading, needsPassword, isInvite, passwordSet } = useSession()
