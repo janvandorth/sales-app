@@ -24,6 +24,8 @@ const PICKER_FIELDS = new Set<ExtractableField>([
 // Read too unreliably from handwriting to trust: unless enabled for the recruiter, the scan leaves these alone and
 // the recruiter types them in. The second number's country code goes with it.
 const CONTACT_FIELDS = new Set<ExtractableField>(["naam", "telefoon", "landcode2", "telefoon2"])
+// Never filled by the scan: the address lookup derives them from the scanned postcode and huisnummer.
+const LOOKED_UP_FIELDS = new Set<ExtractableField>(["straat", "plaats"])
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -57,7 +59,8 @@ export function useScanFill(form: SalesFormApi, userId: string, scanContactField
     const filled: ExtractableField[] = []
     for (const name of EXTRACTABLE_FIELDS) {
       let value = fields[name]
-      if (value === undefined || (!scanContactFields && CONTACT_FIELDS.has(name))) continue
+      if (value === undefined || LOOKED_UP_FIELDS.has(name)) continue
+      if (!scanContactFields && CONTACT_FIELDS.has(name)) continue
       if (name === "naam" && normalizeNaam(value) !== value) {
         setNaamCorrection({ typed: value, corrected: normalizeNaam(value) })
         value = normalizeNaam(value)
