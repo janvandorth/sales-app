@@ -21,14 +21,19 @@ const PICKER_FIELDS = new Set<ExtractableField>([
   "betaalperiode",
 ])
 
+// Read too unreliably from handwriting to trust: unless enabled for the recruiter, the scan leaves these alone and
+// the recruiter types them in. The second number's country code goes with it.
+const CONTACT_FIELDS = new Set<ExtractableField>(["naam", "telefoon", "landcode2", "telefoon2"])
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
  * Camera scan: uploads the photo, lets the backend read it with Claude and types the result into the form,
  * top to bottom. `phase` drives the blocking overlay: "reading" shows a spinner, "filling" only blocks input.
  * The scanned name gets the same capitalization fix as a typed one; `naamCorrection` lets the field offer undo.
+ * Name and phone numbers are only filled when `scanContactFields` is on for this recruiter.
  */
-export function useScanFill(form: SalesFormApi, userId: string) {
+export function useScanFill(form: SalesFormApi, userId: string, scanContactFields: boolean) {
   const [phase, setPhase] = useState<"reading" | "filling" | null>(null)
   const [naamCorrection, setNaamCorrection] = useState<NaamCorrection | null>(null)
 
@@ -52,7 +57,7 @@ export function useScanFill(form: SalesFormApi, userId: string) {
     const filled: ExtractableField[] = []
     for (const name of EXTRACTABLE_FIELDS) {
       let value = fields[name]
-      if (value === undefined) continue
+      if (value === undefined || (!scanContactFields && CONTACT_FIELDS.has(name))) continue
       if (name === "naam" && normalizeNaam(value) !== value) {
         setNaamCorrection({ typed: value, corrected: normalizeNaam(value) })
         value = normalizeNaam(value)
