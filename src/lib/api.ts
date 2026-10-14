@@ -184,7 +184,7 @@ export async function listSales(
 
 // --- Admin ---------------------------------------------------------------------------------------
 
-export type AdminProfileInput = { wervernaam: string; wervernr: string; isAdmin: boolean }
+export type AdminProfileInput = { wervernaam: string; wervernr: string; isAdmin: boolean; scanContactFields: boolean }
 
 export const adminApi = {
   list: () => invoke<{ users: AdminUser[] }>("admin-users", { action: "list" }).then((result) => result.users),
