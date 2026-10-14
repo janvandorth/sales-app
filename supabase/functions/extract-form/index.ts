@@ -7,6 +7,7 @@ import {
   EXTRACTABLE_FIELDS,
   extractionSchema,
   normalizeIban,
+  type ExtractableField,
   type ExtractedFields,
   type Extraction,
 } from "../_shared/form-schema.ts"
@@ -73,6 +74,12 @@ const MOCK_EXTRACTION: Extraction = {
 }
 const MOCK_DELAY_MS = 2500
 
+// Read too unreliably from handwriting to trust: only returned for recruiters with profiles.scan_contact_fields on.
+// The second number's country code goes with it.
+const CONTACT_FIELDS: readonly ExtractableField[] = ["naam", "telefoon", "landcode2", "telefoon2"]
+// Never returned: the app's address lookup derives them from postcode and huisnummer.
+const LOOKED_UP_FIELDS: readonly ExtractableField[] = ["straat", "plaats"]
+
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
   const { path } = await req.json()
@@ -81,9 +88,13 @@ serve(async (req) => {
   }
 
   const apiKey = optionalEnv("ANTHROPIC_API_KEY")
-  const result = apiKey
-    ? { fields: normalize(await readWithClaude(supabase, path, apiKey)), mock: false }
-    : { fields: normalize(await mockRead()), mock: true }
+  const [extraction, scanContactFields] = await Promise.all([
+    apiKey ? readWithClaude(supabase, path, apiKey) : mockRead(),
+    canScanContactFields(supabase, user.id),
+  ])
+  // Fields left out are not in the answer at all, so every app version leaves them for the recruiter to type.
+  const withheld = scanContactFields ? LOOKED_UP_FIELDS : [...LOOKED_UP_FIELDS, ...CONTACT_FIELDS]
+  const result = { fields: omit(normalize(extraction), withheld), mock: !apiKey }
 
   // The photo contains personal data (IBAN, phone, address): delete it once it has been read successfully.
   // After a failure it is kept so the scan can be retried or investigated.
@@ -135,6 +146,20 @@ async function readWithClaude(supabase: SupabaseClient, path: string, apiKey: st
   const parsed = extractionSchema.safeParse(JSON.parse(text.text))
   if (!parsed.success) throw new HttpError(502, "Onverwacht resultaat bij het uitlezen")
   return parsed.data
+}
+
+/** The recruiter's scan_contact_fields setting, read on every scan so an admin's change applies at once. */
+async function canScanContactFields(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("profiles").select("scan_contact_fields").eq("id", userId).single()
+  // Fail closed: without the setting, leave the fields to the recruiter rather than lose the whole scan.
+  if (error) console.error(`Could not read scan_contact_fields for ${userId}`, error)
+  return data?.scan_contact_fields === true
+}
+
+function omit(fields: ExtractedFields, keys: readonly ExtractableField[]): ExtractedFields {
+  const kept = { ...fields }
+  for (const key of keys) delete kept[key]
+  return kept
 }
 
 async function mockRead(): Promise<Extraction> {
