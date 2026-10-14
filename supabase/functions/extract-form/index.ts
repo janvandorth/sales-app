@@ -3,15 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { requireUser } from "../_shared/auth.ts"
 import { optionalEnv } from "../_shared/env.ts"
-import {
-  EXTRACTABLE_FIELDS,
-  extractionSchema,
-  normalizeIban,
-  type ExtractableField,
-  type ExtractedFields,
-  type Extraction,
-} from "../_shared/form-schema.ts"
+import { extractionSchema, type Extraction } from "../_shared/form-schema.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
+import { toScanResult } from "../_shared/scan-result.ts"
 import { SCANS_BUCKET } from "../_shared/storage.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
 
@@ -74,12 +68,6 @@ const MOCK_EXTRACTION: Extraction = {
 }
 const MOCK_DELAY_MS = 2500
 
-// Read too unreliably from handwriting to trust: only returned for recruiters with profiles.scan_contact_fields on.
-// The second number's country code goes with it.
-const CONTACT_FIELDS: readonly ExtractableField[] = ["naam", "telefoon", "landcode2", "telefoon2"]
-// Never returned: the app's address lookup derives them from postcode and huisnummer.
-const LOOKED_UP_FIELDS: readonly ExtractableField[] = ["straat", "plaats"]
-
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
   const { path } = await req.json()
@@ -92,9 +80,7 @@ serve(async (req) => {
     apiKey ? readWithClaude(supabase, path, apiKey) : mockRead(),
     canScanContactFields(supabase, user.id),
   ])
-  // Fields left out are not in the answer at all, so every app version leaves them for the recruiter to type.
-  const withheld = scanContactFields ? LOOKED_UP_FIELDS : [...LOOKED_UP_FIELDS, ...CONTACT_FIELDS]
-  const result = { fields: omit(normalize(extraction), withheld), mock: !apiKey }
+  const result = { fields: toScanResult(extraction, scanContactFields), mock: !apiKey }
 
   // The photo contains personal data (IBAN, phone, address): delete it once it has been read successfully.
   // After a failure it is kept so the scan can be retried or investigated.
@@ -156,55 +142,14 @@ async function canScanContactFields(supabase: SupabaseClient, userId: string): P
   return data?.scan_contact_fields === true
 }
 
-function omit(fields: ExtractedFields, keys: readonly ExtractableField[]): ExtractedFields {
-  const kept = { ...fields }
-  for (const key of keys) delete kept[key]
-  return kept
-}
-
 async function mockRead(): Promise<Extraction> {
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
   return extractionSchema.parse({ ...MOCK_EXTRACTION, datum: amsterdamToday() })
 }
 
-/** Cleans up what was read into the shape the form expects, and drops empty (not found) values. */
-function normalize(extraction: Extraction): ExtractedFields {
-  const cleaned: Extraction = {
-    ...extraction,
-    huisnummer: extraction.huisnummer.replace(/\D/g, ""),
-    telefoon: cleanPhone(extraction.telefoon),
-    telefoon2: cleanPhone(extraction.telefoon2),
-    landcode2: cleanLandcode(extraction.landcode2),
-    iban: normalizeIban(extraction.iban),
-    landcode: cleanLandcode(extraction.landcode),
-    datum: isRealDate(extraction.datum.trim()) ? extraction.datum.trim() : "",
-  }
-  const fields: Record<string, string> = {}
-  for (const key of EXTRACTABLE_FIELDS) {
-    const value = cleaned[key].trim()
-    if (value) fields[key] = value
-  }
-  return fields as ExtractedFields
-}
-
-function cleanPhone(value: string): string {
-  return value.replace(/\D/g, "").replace(/^0+/, "")
-}
-
-function cleanLandcode(value: string): string {
-  return /^\+\d{1,4}$/.test(value.trim()) ? value.trim() : ""
-}
-
 /** Today's date in the Netherlands, yyyy-MM-dd: the edge function runs in UTC. */
 function amsterdamToday(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Amsterdam" }).format(new Date())
-}
-
-/** yyyy-MM-dd that exists on the calendar (no 31 June), so the form's date field accepts it. */
-function isRealDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  const date = new Date(`${value}T00:00:00Z`)
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 
 function encodeBase64(bytes: Uint8Array): string {
