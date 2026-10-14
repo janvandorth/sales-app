@@ -1,7 +1,13 @@
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
 
-export type Profile = { wervernaam: string; wervernr: string; isAdmin: boolean }
+export type Profile = {
+  wervernaam: string
+  wervernr: string
+  isAdmin: boolean
+  /** Whether the photo scan may fill in the name and phone numbers (off unless enabled for this recruiter). */
+  scanContactFields: boolean
+}
 
 const cacheKey = (userId: string) => `profile:${userId}`
 
@@ -17,11 +23,16 @@ function readCachedProfile(userId: string): Profile | undefined {
 async function fetchProfile(userId: string): Promise<Profile> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("wervernaam, wervernr, is_admin")
+    .select("wervernaam, wervernr, is_admin, scan_contact_fields")
     .eq("id", userId)
     .single()
   if (error) throw error
-  const profile = { wervernaam: data.wervernaam, wervernr: data.wervernr, isAdmin: data.is_admin }
+  const profile = {
+    wervernaam: data.wervernaam,
+    wervernr: data.wervernr,
+    isAdmin: data.is_admin,
+    scanContactFields: data.scan_contact_fields,
+  }
   try {
     localStorage.setItem(cacheKey(userId), JSON.stringify(profile))
   } catch {

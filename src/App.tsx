@@ -19,7 +19,12 @@ export default function App() {
 
   function content() {
     if (import.meta.env.DEV && DEMO_MODE) {
-      const demoProfile = { wervernaam: "Jan van Dorth", wervernr: "0212BB", isAdmin: DEMO_MODE === "admin" }
+      const demoProfile = {
+        wervernaam: "Jan van Dorth",
+        wervernr: "0212BB",
+        isAdmin: DEMO_MODE === "admin",
+        scanContactFields: false,
+      }
       // `?demo&verkopen` shows the sales list instead of the dashboard.
       if (new URLSearchParams(window.location.search).has("verkopen")) {
         return <SalesListPage profile={demoProfile} userId={undefined} onBack={() => {}} />

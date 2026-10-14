@@ -35,7 +35,7 @@ export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }:
     mode: "onTouched",
   })
   const { ready } = useDraft(form, userId)
-  const scanFill = useScanFill(form, userId)
+  const scanFill = useScanFill(form, userId, profile?.scanContactFields ?? false)
   const [submitting, setSubmitting] = useState(false)
   const [outboxOpen, setOutboxOpen] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
