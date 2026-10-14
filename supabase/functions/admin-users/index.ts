@@ -9,6 +9,8 @@ const profileFields = {
   wervernaam: z.string().trim().min(1, "Vul de wervernaam in").max(100),
   wervernr: z.string().trim().min(1, "Vul het wervernummer in").max(50),
   isAdmin: z.boolean(),
+  // Optional so an app that has not updated yet can still save a profile; missing = leave unchanged.
+  scanContactFields: z.boolean().optional(),
 }
 
 const requestSchema = z.discriminatedUnion("action", [
@@ -49,14 +51,8 @@ serve(async (req) => {
       })
       if (error?.code === "email_exists") throw new HttpError(409, "Er bestaat al een gebruiker met dit e-mailadres")
       if (error) throw new HttpError(400, error.message)
-      // The on_auth_user_created trigger created the profile from the metadata; only the admin flag is left.
-      if (body.isAdmin) {
-        await updateProfile(caller.id, data.user.id, {
-          wervernaam: body.wervernaam,
-          wervernr: body.wervernr,
-          isAdmin: true,
-        })
-      }
+      // The on_auth_user_created trigger created the profile from the metadata; only the flags are left.
+      if (body.isAdmin || body.scanContactFields) await updateProfile(caller.id, data.user.id, body)
       return json({ ok: true })
     }
 
@@ -100,7 +96,7 @@ async function listUsers(): Promise<AdminUser[]> {
   }
 
   const [{ data: profiles, error: profilesError }, { data: counts, error: countsError }] = await Promise.all([
-    admin.from("profiles").select("id, wervernaam, wervernr, is_admin"),
+    admin.from("profiles").select("id, wervernaam, wervernr, is_admin, scan_contact_fields"),
     admin.rpc("submission_counts"),
   ])
   if (profilesError) throw profilesError
@@ -121,6 +117,7 @@ async function listUsers(): Promise<AdminUser[]> {
         wervernaam: profile?.wervernaam ?? "",
         wervernr: profile?.wervernr ?? "",
         isAdmin: profile?.is_admin ?? false,
+        scanContactFields: profile?.scan_contact_fields ?? false,
         status: banned ? "disabled" : user.email_confirmed_at ? "active" : "invited",
         invitedAt: user.invited_at ?? null,
         lastSignInAt: user.last_sign_in_at ?? null,
@@ -134,7 +131,7 @@ async function listUsers(): Promise<AdminUser[]> {
 async function updateProfile(
   actorId: string,
   profileId: string,
-  profile: { wervernaam: string; wervernr: string; isAdmin: boolean },
+  profile: { wervernaam: string; wervernr: string; isAdmin: boolean; scanContactFields?: boolean },
 ) {
   const { error } = await admin.rpc("update_profile_as_admin", {
     p_actor: actorId,
@@ -142,6 +139,7 @@ async function updateProfile(
     p_wervernaam: profile.wervernaam,
     p_wervernr: profile.wervernr,
     p_is_admin: profile.isAdmin,
+    p_scan_contact_fields: profile.scanContactFields ?? null,
   })
   if (error?.code === "23505") throw new HttpError(409, "Dit wervernummer is al in gebruik")
   if (error) throw error

@@ -7,6 +7,7 @@ import {
   MoreVerticalIcon,
   PencilIcon,
   RefreshCwIcon,
+  ScanTextIcon,
   ShieldCheckIcon,
   UserPlusIcon,
 } from "lucide-react"
@@ -111,6 +112,11 @@ function UserCard({ user, isSelf, onEdit }: { user: AdminUser; isSelf: boolean; 
             {user.isAdmin && (
               <Badge variant="outline" className="gap-1">
                 <ShieldCheckIcon /> Beheerder
+              </Badge>
+            )}
+            {user.scanContactFields && (
+              <Badge variant="outline" className="gap-1">
+                <ScanTextIcon /> Scant naam en telefoon
               </Badge>
             )}
           </div>

@@ -5,6 +5,8 @@ export type AdminUser = {
   wervernaam: string
   wervernr: string
   isAdmin: boolean
+  /** Whether the photo scan may fill in the customer's name and phone numbers for this recruiter. */
+  scanContactFields: boolean
   status: "active" | "invited" | "disabled"
   invitedAt: string | null
   lastSignInAt: string | null

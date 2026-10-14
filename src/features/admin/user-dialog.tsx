@@ -36,6 +36,7 @@ export function UserDialog({ user, isSelf, onClose }: Props) {
     wervernaam: user?.wervernaam ?? "",
     wervernr: user?.wervernr ?? "",
     isAdmin: user?.isAdmin ?? false,
+    scanContactFields: user?.scanContactFields ?? false,
   })
   const save = useAdminAction(
     () => (user ? adminApi.update(user.id, profile) : adminApi.invite(email.trim(), profile)),
@@ -110,6 +111,17 @@ export function UserDialog({ user, isSelf, onClose }: Props) {
                 checked={profile.isAdmin}
                 disabled={isSelf}
                 onCheckedChange={(checked) => setProfile({ ...profile, isAdmin: checked })}
+              />
+            </Field>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor="scan-contact-fields">Naam en telefoon scannen</FieldLabel>
+                <FieldDescription>De scanner vult ook naam en telefoonnummers in</FieldDescription>
+              </FieldContent>
+              <Switch
+                id="scan-contact-fields"
+                checked={profile.scanContactFields}
+                onCheckedChange={(checked) => setProfile({ ...profile, scanContactFields: checked })}
               />
             </Field>
           </FieldGroup>
