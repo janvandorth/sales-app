@@ -95,6 +95,9 @@ export const formSchema = z
       .enum([...BETAALPERIODE_OPTIONS, ""], { error: "Kies een betaaltermijn" })
       .transform(requireChoice("Kies een betaaltermijn")),
     opmerkingen: z.string().trim().max(2000),
+    // The scanned photo of the paper contract in the scans bucket, "" when the form was typed in. Sent along to
+    // onboarding, which files it with the customer. submit-form checks that it is in the caller's own folder.
+    scanPath: z.string().max(200),
   })
   .refine((values) => values.perPost || z.email().safeParse(values.email).success, {
     path: ["email"],
@@ -119,6 +122,7 @@ export const ADDED_FIELD_DEFAULTS = {
   telefoon2: "",
   ibanTnvZelfde: true,
   ibanTnv: "",
+  scanPath: "",
 } satisfies Partial<FormInput>
 
 /** Parses a submitted form body, filling in fields an older app version does not send. */

@@ -27,6 +27,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  * Camera scan: uploads the photo, lets the backend read it with Claude and types the result into the form,
  * top to bottom. `phase` drives the blocking overlay: "reading" shows a spinner, "filling" only blocks input.
  * The scanned name gets the same capitalization fix as a typed one; `naamCorrection` lets the field offer undo.
+ * The photo is kept with the form (`scanPath`) and sent with it; a new scan replaces it.
  */
 export function useScanFill(form: SalesFormApi, userId: string) {
   const [phase, setPhase] = useState<"reading" | "filling" | null>(null)
@@ -36,7 +37,8 @@ export function useScanFill(form: SalesFormApi, userId: string) {
     setPhase("reading")
     setNaamCorrection(null)
     try {
-      const { fields, mock } = await extractFromPhoto(userId, await prepareScanImage(photo))
+      const { fields, mock, path } = await extractFromPhoto(userId, await prepareScanImage(photo))
+      form.setValue("scanPath", path, { shouldDirty: true })
       setPhase("filling")
       await typeIntoForm(fields)
       if (mock) toast.info("Demo: voorbeeldgegevens ingevuld (Claude is nog niet gekoppeld)")

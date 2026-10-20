@@ -4,9 +4,13 @@ import { parseSubmittedForm } from "../_shared/form-schema.ts"
 import { appendSheetRow, isSheetsConfigured } from "../_shared/google-sheets.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { isOnboardingConfigured, sendToOnboarding } from "../_shared/onboarding.ts"
+import { isOwnScanPath } from "../_shared/storage.ts"
 import { toSheetRow, toSubmissionRecord } from "../_shared/submission-record.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
 import { isTestRequest } from "../_shared/test-request.ts"
+
+/** Supabase's edge runtime keeps the function alive for a promise passed here after the response has gone. */
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
 serve(async (req) => {
   const { user } = await requireUser(req)
@@ -14,6 +18,10 @@ serve(async (req) => {
   const parsed = parseSubmittedForm(await req.json())
   if (!parsed.success) {
     return json({ error: "Formulier bevat fouten", issues: parsed.error.issues }, 400)
+  }
+  // Onboarding sends the scan to ZMAdmin with the service role, so it must be the caller's own photo.
+  if (parsed.data.scanPath && !isOwnScanPath(parsed.data.scanPath, user.id)) {
+    throw new HttpError(400, "Ongeldig bestandspad van de foto")
   }
   const admin = createAdminClient()
 
@@ -37,18 +45,24 @@ serve(async (req) => {
   const isNew = inserted.length > 0
   if (!isNew) await assertOwnedBy(admin, record.row_id, user.id)
 
-  // The submission is safely stored; whatever fails here is retried by sync-sheet and sync-onboarding.
+  // The submission is safely stored; whatever fails here is retried by sync-sheet and sync-onboarding. It runs
+  // after the response: with a photo, onboarding may take up to a minute, and the recruiter need not wait for it.
   if (isNew) {
-    await Promise.all([
-      isSheetsConfigured() &&
-        !record.test &&
-        appendSheetRow(toSheetRow(record))
-          .then(() =>
-            admin.from("submissions").update({ sheet_synced_at: new Date().toISOString() }).eq("row_id", record.row_id),
-          )
-          .catch(console.error),
-      isOnboardingConfigured() && sendToOnboarding(admin, record).catch(console.error),
-    ])
+    EdgeRuntime.waitUntil(
+      Promise.all([
+        isSheetsConfigured() &&
+          !record.test &&
+          appendSheetRow(toSheetRow(record))
+            .then(() =>
+              admin
+                .from("submissions")
+                .update({ sheet_synced_at: new Date().toISOString() })
+                .eq("row_id", record.row_id),
+            )
+            .catch(console.error),
+        isOnboardingConfigured() && sendToOnboarding(admin, record).catch(console.error),
+      ]),
+    )
   }
 
   return json({ ok: true, rowId: record.row_id, duplicate: !isNew })

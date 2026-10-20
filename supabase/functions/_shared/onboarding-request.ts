@@ -27,6 +27,14 @@ export type OnboardingForm = {
   Datum: string
 }
 
+/** A photo of the signed paper contract; the endpoint files it with the customer in ZMAdmin. */
+export type OnboardingPhoto = {
+  /** image/jpeg, image/png or image/webp, at most 10 MB before encoding. */
+  ContentType: string
+  /** The image, base64-encoded. */
+  Data: string
+}
+
 export type OnboardingRequest = {
   ProviderId: number
   IntegrationKey: string
@@ -40,6 +48,8 @@ export type OnboardingRequest = {
     CompleteTime: string
     AnswersJson: { page1: OnboardingForm }
   }
+  /** In page order; at most 5. Empty when the sale was typed in without a scan. */
+  Photos: OnboardingPhoto[]
 }
 
 const GESLACHT_CODES: Record<string, string> = { Man: "M", Vrouw: "V" }
@@ -67,9 +77,9 @@ export function toOnboardingPhone(telefoon: string): string {
 
 /**
  * The onboarding request for a stored submission. The submission id is Appeee's entry id, so a resend of the
- * same sale carries the same id.
+ * same sale carries the same id. `photos` are the scans of the paper contract, read from storage by the caller.
  */
-export function toOnboardingRequest(record: SubmissionRecord): OnboardingRequest {
+export function toOnboardingRequest(record: SubmissionRecord, photos: OnboardingPhoto[] = []): OnboardingRequest {
   return {
     ProviderId: 0,
     IntegrationKey: "",
@@ -107,5 +117,6 @@ export function toOnboardingRequest(record: SubmissionRecord): OnboardingRequest
         },
       },
     },
+    Photos: photos,
   }
 }

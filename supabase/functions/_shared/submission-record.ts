@@ -30,6 +30,8 @@ export type SubmissionRecord = {
   opmerkingen: string
   /** Submitted from the test deployment: onboarded on TEST and kept out of the Google Sheet. */
   test: boolean
+  /** The scanned paper contract in the scans bucket, "" when none; sent with the sale to onboarding. */
+  scan_path: string
 }
 
 export type Recruiter = { wervernaam: string; wervernr: string }
@@ -70,6 +72,7 @@ export function toSubmissionRecord(
     betaalperiode: values.betaalperiode,
     opmerkingen: values.opmerkingen,
     test,
+    scan_path: values.scanPath,
   }
 }
 

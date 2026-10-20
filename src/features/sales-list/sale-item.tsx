@@ -1,4 +1,12 @@
-import { BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, CloudOffIcon, TriangleAlertIcon } from "lucide-react"
+import {
+  BuildingIcon,
+  CalendarIcon,
+  CheckIcon,
+  CircleHelpIcon,
+  ClockIcon,
+  CloudOffIcon,
+  TriangleAlertIcon,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { OnboardingStatus, SubmittedSale } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -76,6 +84,13 @@ function StatusBadge({ status }: { status: Props["status"] }) {
         // ZMAdmin's technical error means nothing to a recruiter; what matters is that the office picks it up.
         <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-300">
           <BuildingIcon /> Kantoor handelt dit af
+        </Badge>
+      )
+    case "unconfirmed":
+      return (
+        // ZMAdmin did not answer in time; the office checks whether the sale arrived.
+        <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-300">
+          <CircleHelpIcon /> Kantoor controleert dit
         </Badge>
       )
     case "queued":

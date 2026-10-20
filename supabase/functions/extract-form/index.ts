@@ -2,12 +2,12 @@ import Anthropic from "@anthropic-ai/sdk"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { requireUser } from "../_shared/auth.ts"
+import { encodeBase64 } from "../_shared/base64.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import { extractionSchema, type Extraction } from "../_shared/form-schema.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { toScanResult } from "../_shared/scan-result.ts"
 import { SCANS_BUCKET } from "../_shared/storage.ts"
-import { createAdminClient } from "../_shared/supabase.ts"
 
 // Opus reads handwriting in the boxed fields (IBAN, phone) far more reliably than Sonnet; low effort keeps the scan fast.
 const MODEL = "claude-opus-5-5"
@@ -80,14 +80,9 @@ serve(async (req) => {
     apiKey ? readWithClaude(supabase, path, apiKey) : mockRead(),
     canScanContactFields(supabase, user.id),
   ])
-  const result = { fields: toScanResult(extraction, scanContactFields), mock: !apiKey }
-
-  // The photo contains personal data (IBAN, phone, address): delete it once it has been read successfully.
-  // After a failure it is kept so the scan can be retried or investigated.
-  const { error } = await createAdminClient().storage.from(SCANS_BUCKET).remove([path])
-  if (error) console.error(`Could not delete scan ${path}`, error)
-
-  return json(result)
+  // The photo stays: the app sends its path with the form, and onboarding files it with the customer in ZMAdmin.
+  // It is deleted once onboarding has accepted the sale, or after SCAN_RETENTION_DAYS (see sync-onboarding).
+  return json({ fields: toScanResult(extraction, scanContactFields), mock: !apiKey })
 })
 
 async function readWithClaude(supabase: SupabaseClient, path: string, apiKey: string): Promise<Extraction> {
@@ -150,12 +145,4 @@ async function mockRead(): Promise<Extraction> {
 /** Today's date in the Netherlands, yyyy-MM-dd: the edge function runs in UTC. */
 function amsterdamToday(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Amsterdam" }).format(new Date())
-}
-
-function encodeBase64(bytes: Uint8Array): string {
-  let binary = ""
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  }
-  return btoa(binary)
 }

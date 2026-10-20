@@ -69,17 +69,21 @@ export function submitForm(values: FormInput) {
   return invoke<{ ok: true; rowId: string; duplicate: boolean }>("submit-form", { ...values })
 }
 
-/** Uploads a scan photo and has it read; the backend deletes the photo after a successful read. */
+/**
+ * Uploads a scan photo and has it read. The photo stays in storage: its `path` goes with the form, so onboarding
+ * can file it with the customer in ZMAdmin.
+ */
 export async function extractFromPhoto(
   userId: string,
   photo: File,
-): Promise<{ fields: ExtractedFields; mock: boolean }> {
+): Promise<{ fields: ExtractedFields; mock: boolean; path: string }> {
   const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg"
   const path = `${userId}/${crypto.randomUUID()}.${extension}`
   const { error } = await supabase.storage.from(SCANS_BUCKET).upload(path, photo, { contentType: photo.type })
   if (error) throw new ApiError("Uploaden van de foto is mislukt", 500)
 
-  return invoke<{ fields: ExtractedFields; mock: boolean }>("extract-form", { path })
+  const result = await invoke<{ fields: ExtractedFields; mock: boolean }>("extract-form", { path })
+  return { ...result, path }
 }
 
 // --- Dashboard ----------------------------------------------------------------------------------
@@ -107,7 +111,7 @@ export async function getKpi(request: KpiRequest): Promise<KpiResponse> {
 
 // --- Sales per day ------------------------------------------------------------------------------
 
-export type OnboardingStatus = "accepted" | "refused" | "failed" | "skipped"
+export type OnboardingStatus = "accepted" | "refused" | "failed" | "skipped" | "unconfirmed"
 
 export type SubmittedSale = {
   rowId: string

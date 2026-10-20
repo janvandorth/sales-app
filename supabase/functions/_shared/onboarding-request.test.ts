@@ -27,6 +27,7 @@ const record: SubmissionRecord = {
   betaalperiode: "Kwartaal Machtiging",
   opmerkingen: "Graag bellen",
   test: false,
+  scan_path: "",
 }
 
 describe("toOnboardingRequest", () => {
@@ -64,6 +65,17 @@ describe("toOnboardingRequest", () => {
     const page = toOnboardingRequest({ ...record, telefoon2: "+31201234567", iban_tnv: "M. de Vries" }).Entry
       .AnswersJson.page1
     expect(page).toMatchObject({ Telefoon2: "0201234567", IBANtnv: "M. de Vries" })
+  })
+})
+
+describe("toOnboardingRequest photos", () => {
+  it("sends no photos for a sale without a scan", () => {
+    expect(toOnboardingRequest(record).Photos).toEqual([])
+  })
+
+  it("sends the scans next to the entry, as the endpoint expects", () => {
+    const photo = { ContentType: "image/jpeg", Data: "/9j/4AAQ" }
+    expect(toOnboardingRequest(record, [photo]).Photos).toEqual([photo])
   })
 })
 
