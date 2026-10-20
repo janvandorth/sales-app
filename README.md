@@ -96,8 +96,16 @@ unless the lookup fails, the phone is offline or the recruiter taps "Aanpassen".
 but online the recruiter has to confirm it first.
 
 **Camera scan.** The photo is downscaled, uploaded to the private `scans` bucket and read by `extract-form`
-with Claude (structured output generated from `extractionSchema`). The photo is deleted after a successful read.
-Without `ANTHROPIC_API_KEY` the function returns demo data.
+with Claude (structured output generated from `extractionSchema`). Without `ANTHROPIC_API_KEY` the function returns
+demo data. The photo's path stays with the form (`scanPath`, also in the draft and the outbox; a new scan replaces
+it), and onboarding sends the photo along (`Photos`, base64) so ZMAdmin files it with the customer (ZMSuite
+`docs/paper-contract-photo.md`). It is deleted from the bucket once onboarding answers 202; `sync-onboarding` deletes
+scans older than 30 days (discarded or refused forms).
+
+**Onboarding.** `submit-form` stores the sale, answers the app, and then sends it to the Contracts API in the
+background (`EdgeRuntime.waitUntil`), waiting up to 60 s for the answer. A timeout is stored as `unconfirmed` and not
+resent automatically, because the sale may have arrived; check ZMAdmin and set `onboarding_status` back to null to
+have `sync-onboarding` resend it.
 
 **Dashboard.** Account menu → "Mijn resultaten" (recruiters) or "Resultaten team" (admins). The `kpi` function
 reads ZMAdmin through the Contracts API (`GET …/Sales/2026.1/Stats`, ZMSuite branch `Jan/feature/sales-stats`):
@@ -125,7 +133,8 @@ otherwise signs out on that device only.
   rejected.
 - **Auditing:** every profile change is written to `profile_changes` with the acting admin.
 - **CORS** is limited to `ALLOWED_ORIGINS`; `sync-sheet` and `sync-onboarding` require `CRON_SECRET`.
-- **Scan photos** are deleted after they have been read successfully.
+- **Scan photos** are kept until onboarding has accepted their sale, at most 30 days. `submit-form` only accepts a
+  `scanPath` in the caller's own folder, since onboarding reads it with the service role.
 
 ## Glossary
 
@@ -176,7 +185,8 @@ as-is in code so they match the Google Sheet and the back office.
   `https://sales-app-git-test-jans-projects-71e0b0fc.vercel.app` (shows a "TESTOMGEVING" banner). It uses the same
   Supabase project. Its build sends an `x-test-deployment` header (and its branch URL is in `TEST_ORIGINS`), so the
   backend stores its sales with `test = true` whatever URL it is opened on.
-  Those are onboarded on test.zekerenmobiel.nl whatever `ONBOARDING_API_ENV` says, and never go to the Google Sheet.
+  Those are onboarded where `ONBOARDING_TEST_API_ENV` says (unset = test.zekerenmobiel.nl), whatever
+  `ONBOARDING_API_ENV` says, and never go to the Google Sheet.
   They do show in "Mijn verkopen" and the database, marked TEST.
   Update it with a merge (`git checkout test && git merge main && git push`): Vercel skips a commit it already
   built for `main`, so pushing `main` itself to `test` deploys nothing.
@@ -200,7 +210,8 @@ Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 | `CRON_SECRET`             | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret` |
 | `ONBOARDING_API_ENV`      | `production` or unset (= test); URLs are in `supabase/functions/_shared/contracts-api.ts`           |
 | `ONBOARDING_API_KEY`      | `X-API-Key` for the Contracts API onboarding endpoint                                               |
-| `ONBOARDING_TEST_API_KEY` | Optional key for test sales when `ONBOARDING_API_KEY` is the production key                         |
+| `ONBOARDING_TEST_API_ENV` | Where test sales are onboarded: `production` or unset (= test)                                      |
+| `ONBOARDING_TEST_API_KEY` | Optional key for test sales; must fit `ONBOARDING_TEST_API_ENV`                                     |
 | `TEST_ORIGINS`            | Origins of the test deployment (format as `ALLOWED_ORIGINS`, and allowed by CORS too)               |
 | `STATS_API_ENV`           | `production` or unset (= test), like `ONBOARDING_API_ENV`                                           |
 | `STATS_API_KEY`           | `X-API-Key` for the stats endpoint; without it the dashboard shows demo numbers                     |

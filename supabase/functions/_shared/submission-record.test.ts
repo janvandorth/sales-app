@@ -26,6 +26,7 @@ const values = formSchema.parse({
   contractType: "Zakelijk",
   betaalperiode: "Jaar Acceptgiro",
   opmerkingen: "Graag bellen",
+  scanPath: "",
 } satisfies FormInput)
 
 const recruiter = { wervernaam: "Anna", wervernr: "W0001" }
@@ -41,6 +42,11 @@ describe("toSubmissionRecord", () => {
     const record = toSubmissionRecord({ ...values, perPost: true, email: "" }, "user-a", recruiter, received)
     expect(record.telefoon).toBe("+31612345678")
     expect(record.email).toBe("Per post")
+  })
+
+  it("keeps the scan of the paper contract for onboarding", () => {
+    const scanPath = "user-a/0b5a1a6e-8a2f-4f3c-9d7e-2d1f4c3b2a10.jpg"
+    expect(toSubmissionRecord({ ...values, scanPath }, "user-a", recruiter, received).scan_path).toBe(scanPath)
   })
 
   it("stores no second phone number or account holder by default", () => {

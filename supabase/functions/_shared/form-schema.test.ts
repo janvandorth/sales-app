@@ -32,6 +32,7 @@ const validForm: FormInput = {
   contractType: "Service",
   betaalperiode: "Maand Machtiging",
   opmerkingen: "",
+  scanPath: "",
 }
 
 const issuesFor = (overrides: Partial<FormInput>) => {
@@ -63,10 +64,15 @@ describe("formSchema", () => {
     ])
   })
 
-  it("accepts a form from an older app version without the second phone number and account holder", () => {
-    const { landcode2: _l, telefoon2: _t, ibanTnvZelfde: _z, ibanTnv: _n, ...older } = validForm
+  it("accepts a form from an older app version without the second phone number, account holder and scan", () => {
+    const { landcode2: _l, telefoon2: _t, ibanTnvZelfde: _z, ibanTnv: _n, scanPath: _s, ...older } = validForm
     expect(formSchema.safeParse(older).success).toBe(false)
-    expect(parseSubmittedForm(older).data).toMatchObject({ telefoon2: "", ibanTnvZelfde: true, ibanTnv: "" })
+    expect(parseSubmittedForm(older).data).toMatchObject({
+      telefoon2: "",
+      ibanTnvZelfde: true,
+      ibanTnv: "",
+      scanPath: "",
+    })
   })
 
   it("checks the second phone number only when one is filled in", () => {
