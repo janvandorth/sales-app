@@ -1,4 +1,6 @@
 // Shared between the web app (via the `@shared` alias) and the edge functions (via deno.json import map).
+import { getExampleNumber, isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js/max"
+import mobileExamples from "libphonenumber-js/mobile/examples"
 import { z } from "zod"
 
 export const GESLACHT_OPTIONS = ["Man", "Vrouw"] as const
@@ -18,6 +20,44 @@ export const PER_POST_EMAIL = "Per post"
 export const PHONE_REGEX = /^[1-9]\d{5,13}$/
 const PHONE_MESSAGE = "Alleen cijfers, zonder 0 of landcode"
 const LANDCODE_REGEX = /^\+\d{1,4}$/
+
+/**
+ * Checks the number against the country's numbering plan (libphonenumber), which knows the right number of digits
+ * per country and per kind of number (e.g. a Dutch mobile is 6 + 8 digits). Returns the error message, or
+ * undefined when the number is valid. Only for numbers that already match PHONE_REGEX.
+ */
+export function phoneNumberError(landcode: string, telefoon: string): string | undefined {
+  const international = `${landcode}${telefoon}`
+  if (isValidPhoneNumber(international)) return undefined
+  const parsed = parsePhoneNumber(international)
+  const country = parsed.country ?? parsed.getPossibleCountries()[0]
+  const example = country && getExampleNumber(country, mobileExamples)?.nationalNumber
+  return example
+    ? `Ongeldig nummer voor dit land; mobiel is bijv. ${example} (${example.length} cijfers)`
+    : "Ongeldig nummer voor dit land"
+}
+
+/** Runs the phone check only when the number itself is filled in correctly, so it shows one message at a time. */
+function checksPhone(landcode: "landcode" | "landcode2", telefoon: "telefoon" | "telefoon2") {
+  return {
+    path: [telefoon],
+    error: (issue: { input: unknown }) => {
+      const values = issue.input as Record<string, string>
+      return phoneNumberError(values[landcode], values[telefoon].trim())
+    },
+    when: ({ value }: { value: unknown }) => {
+      if (typeof value !== "object" || value === null) return false
+      const values = value as Record<string, unknown>
+      const number = values[telefoon]
+      return (
+        typeof values[landcode] === "string" &&
+        LANDCODE_REGEX.test(values[landcode]) &&
+        typeof number === "string" &&
+        PHONE_REGEX.test(number.trim())
+      )
+    },
+  }
+}
 
 export const POSTCODE_REGEX = /^[1-9]\d{3}\s?[A-Za-z]{2}$/
 
@@ -110,6 +150,9 @@ export const formSchema = z
     message: "Vul in op wiens naam de rekening staat",
     when: ({ value }) => typeof value === "object" && value !== null && "ibanTnvZelfde" in value && "ibanTnv" in value,
   })
+  .refine((values) => !phoneNumberError(values.landcode, values.telefoon), checksPhone("landcode", "telefoon"))
+  // telefoon2 "" fails PHONE_REGEX, so an empty second number is never checked.
+  .refine((values) => !phoneNumberError(values.landcode2, values.telefoon2), checksPhone("landcode2", "telefoon2"))
 
 export type FormInput = z.input<typeof formSchema>
 

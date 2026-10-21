@@ -3,6 +3,7 @@
   "specifiers": {
     "npm:@anthropic-ai/sdk@0.129": "0.129.0_zod@4.6.5",
     "npm:@supabase/supabase-js@2": "2.117.2",
+    "npm:libphonenumber-js@^1.13.15": "1.13.15",
     "npm:zod@4": "4.6.5"
   },
   "npm": {
@@ -82,6 +83,9 @@
         "ts-algebra"
       ]
     },
+    "libphonenumber-js@1.13.15": {
+      "integrity": "sha512-AHdhEQeDFEJ4GKDAQ9AwxChy+v2kUILUB3TGQRpkXMkWePjXTU/WQEzWVQoIx/Gz8fE73Wr5SEuZCy2vk8jrMQ=="
+    },
     "standardwebhooks@1.1.1": {
       "integrity": "sha512-bCbX9ZEyFkWPsRz7Bl3NuQUJohmwGSev/yhr7vhaGPlc4AfIrspIRa6cPTBuI1ItmrTDJ4d/S2hCsfe4+vQGnQ==",
       "dependencies": [
@@ -103,6 +107,7 @@
     "dependencies": [
       "npm:@anthropic-ai/sdk@0.129",
       "npm:@supabase/supabase-js@2",
+      "npm:libphonenumber-js@^1.13.15",
       "npm:zod@4"
     ]
   }
