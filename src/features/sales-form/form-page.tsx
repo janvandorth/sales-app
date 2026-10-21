@@ -3,7 +3,7 @@ import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import type { Session } from "@supabase/supabase-js"
-import { formSchema, type FormInput, type FormValues } from "@shared/form-schema"
+import type { FormInput, FormValues } from "@shared/form-schema"
 import { Spinner } from "@/components/ui/spinner"
 import { ChangePasswordDialog } from "@/features/auth/change-password-dialog"
 import { useOnline } from "@/hooks/use-online"
@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase"
 import { OutboxDialog } from "../outbox/outbox-dialog"
 import type { OutboxItem } from "../outbox/outbox-store"
 import { useOutbox } from "../outbox/use-outbox"
+import { salesFormSchema } from "./contract-date"
 import { clearDraft } from "./draft-store"
 import { createEmptyForm } from "./form-defaults"
 import { FormHeader } from "./form-header"
@@ -30,7 +31,7 @@ export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }:
   const profile = useProfile(userId)
   const outbox = useOutbox(userId)
   const form = useForm<FormInput, unknown, FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(salesFormSchema),
     defaultValues: createEmptyForm(),
     mode: "onTouched",
   })

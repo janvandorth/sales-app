@@ -1,14 +1,13 @@
 import { AddressHint } from "../address-hint"
 import { CheckIndicator } from "../check-indicator"
 import { TextField } from "../fields/text-field"
-import type { SalesFormApi } from "../form-types"
-import { useAddressLookup } from "../use-address-lookup"
+import type { SalesFormControl } from "../form-types"
+import type { useAddressLookup } from "../use-address-lookup"
 import { FormSection } from "./form-section"
 
-export function AddressSection({ form }: { form: SalesFormApi }) {
-  const { control } = form
-  const lookup = useAddressLookup(form)
+type Props = { control: SalesFormControl; lookup: ReturnType<typeof useAddressLookup> }
 
+export function AddressSection({ control, lookup }: Props) {
   return (
     <FormSection title="Adres">
       <TextField
