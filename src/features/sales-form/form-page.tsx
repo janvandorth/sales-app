@@ -120,6 +120,7 @@ export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }:
         <SalesForm
           key={rowId}
           form={form}
+          profile={profile}
           submitting={submitting}
           naamCorrection={scanFill.naamCorrection}
           onSubmit={handleSubmit}

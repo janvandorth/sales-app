@@ -3,7 +3,9 @@ import type { FormValues } from "@shared/form-schema"
 import { PAGE_WIDTH } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import type { Profile } from "@/hooks/use-profile"
 import { DiscardButton } from "./discard-button"
+import { WerverField } from "./fields/werver-field"
 import type { SalesFormApi } from "./form-types"
 import { InvalidIbanDialog } from "./invalid-iban-dialog"
 import type { NaamCorrection } from "./naam"
@@ -11,10 +13,13 @@ import { AddressSection } from "./sections/address-section"
 import { ContactSection } from "./sections/contact-section"
 import { ContractSection } from "./sections/contract-section"
 import { CustomerSection } from "./sections/customer-section"
+import { FormSection } from "./sections/form-section"
 import { useIbanCheck } from "./use-iban-check"
 
 type Props = {
   form: SalesFormApi
+  /** An admin may book the sale on another recruiter. */
+  profile: Profile | undefined
   submitting: boolean
   /** Capitalization fix made while filling in a scanned form. */
   naamCorrection: NaamCorrection | null
@@ -22,8 +27,8 @@ type Props = {
   onDiscard: () => void
 }
 
-/** The sales form itself: four sections plus a fixed bottom bar with Wissen / Versturen. */
-export function SalesForm({ form, submitting, naamCorrection, onSubmit, onDiscard }: Props) {
+/** The sales form itself: four sections (plus the werver for admins) and a fixed bottom bar with Wissen / Versturen. */
+export function SalesForm({ form, profile, submitting, naamCorrection, onSubmit, onDiscard }: Props) {
   const iban = useIbanCheck(form, onSubmit)
   const busy = submitting || iban.checkingOnSubmit
 
@@ -33,6 +38,13 @@ export function SalesForm({ form, submitting, naamCorrection, onSubmit, onDiscar
       noValidate
       className={`mx-auto grid gap-4 p-4 pb-24 lg:grid-cols-2 lg:items-start ${PAGE_WIDTH}`}
     >
+      {profile?.isAdmin && (
+        <div className="lg:col-span-2">
+          <FormSection title="Werver">
+            <WerverField control={form.control} profile={profile} />
+          </FormSection>
+        </div>
+      )}
       {/* Two columns on a large screen; on a phone the columns stack, so the order stays Klant, Adres, Contact, Contract. */}
       <div className="flex min-w-0 flex-col gap-4">
         <CustomerSection control={form.control} naamCorrection={naamCorrection} />
