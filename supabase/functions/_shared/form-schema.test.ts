@@ -98,6 +98,26 @@ describe("formSchema", () => {
   it("rejects a phone number with a leading 0", () => {
     expect(issuesFor({ telefoon: "0612345678" })).toContain("telefoon")
   })
+
+  it("checks the number of digits for the chosen country", () => {
+    expect(issuesFor({ telefoon: "61234567" })).toEqual(["telefoon"])
+    expect(issuesFor({ telefoon: "6123456789" })).toEqual(["telefoon"])
+    expect(issuesFor({ telefoon: "201234567" })).toEqual([])
+    expect(issuesFor({ landcode: "+32", telefoon: "470123456" })).toEqual([])
+    expect(issuesFor({ landcode: "+49", telefoon: "15112345678" })).toEqual([])
+    expect(issuesFor({ landcode: "+45", telefoon: "20123456" })).toEqual([])
+    expect(issuesFor({ landcode2: "+44", telefoon2: "79111234" })).toEqual(["telefoon2"])
+  })
+
+  it("tells how many digits a mobile number has in that country", () => {
+    const result = formSchema.safeParse({ ...validForm, telefoon: "61234567" })
+    expect(result.error?.issues[0].message).toBe("Ongeldig nummer voor dit land; mobiel is bijv. 612345678 (9 cijfers)")
+  })
+
+  it("shows only the format message when the number has a leading 0", () => {
+    const result = formSchema.safeParse({ ...validForm, telefoon: "0612345678" })
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual(["Alleen cijfers, zonder 0 of landcode"])
+  })
 })
 
 describe("IBAN helpers", () => {
