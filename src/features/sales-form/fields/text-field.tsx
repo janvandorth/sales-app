@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react"
-import { Controller, type FieldPath } from "react-hook-form"
+import { Controller } from "react-hook-form"
 import type { FormInput } from "@shared/form-schema"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -7,8 +7,8 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import type { SalesFormControl } from "../form-types"
 
 type StringFieldName = {
-  [K in FieldPath<FormInput>]: FormInput[K] extends string ? K : never
-}[FieldPath<FormInput>]
+  [K in keyof FormInput]: FormInput[K] extends string ? K : never
+}[keyof FormInput]
 
 type Props = {
   control: SalesFormControl

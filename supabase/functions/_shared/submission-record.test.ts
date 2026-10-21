@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { formSchema, SHEET_COLUMNS, type FormInput } from "./form-schema"
-import { toSheetRow, toSubmissionRecord } from "./submission-record"
+import { chooseRecruiter, toSheetRow, toSubmissionRecord } from "./submission-record"
 
 const values = formSchema.parse({
   rowId: "0b5a1a6e-8a2f-4f3c-9d7e-2d1f4c3b2a10",
@@ -27,10 +27,38 @@ const values = formSchema.parse({
   betaalperiode: "Jaar Acceptgiro",
   opmerkingen: "Graag bellen",
   scanPath: "",
+  werver: null,
 } satisfies FormInput)
 
 const recruiter = { wervernaam: "Anna", wervernr: "W0001" }
 const received = new Date("2026-09-30T08:10:00.000Z")
+
+describe("chooseRecruiter", () => {
+  const picked = { wervernaam: "Piet Pietersen", wervernr: "0212BB" }
+
+  it("books an admin's sale on the werver they picked", () => {
+    expect(chooseRecruiter({ ...recruiter, is_admin: true }, picked)).toEqual(picked)
+  })
+
+  it("books an admin's sale on themselves when they picked nobody", () => {
+    expect(chooseRecruiter({ ...recruiter, is_admin: true }, null)).toEqual(recruiter)
+  })
+
+  it("never lets a recruiter who is not an admin book a sale on someone else", () => {
+    expect(chooseRecruiter({ ...recruiter, is_admin: false }, picked)).toEqual(recruiter)
+  })
+
+  it("takes the picked werver from validated form values", () => {
+    const record = toSubmissionRecord(
+      values,
+      "user-a",
+      chooseRecruiter({ ...recruiter, is_admin: true }, formSchema.parse({ ...values, werver: picked }).werver),
+      received,
+    )
+    expect(record).toMatchObject({ user_id: "user-a", wervernaam: "Piet Pietersen", wervernr: "0212BB" })
+    expect(toSheetRow(record)).toMatchObject({ CompletedBy: "Piet Pietersen", Wervernaam: "Piet Pietersen" })
+  })
+})
 
 describe("toSubmissionRecord", () => {
   it("takes the user and recruiter from the verified caller, not from the form", () => {

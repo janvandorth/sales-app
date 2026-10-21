@@ -122,7 +122,7 @@ function isNotFound(error: unknown): boolean {
 }
 
 /** A test sale may need TEST's key when ONBOARDING_API_KEY holds the production key. */
-function onboardingKey(test: boolean): string {
+export function onboardingKey(test: boolean): string {
   return (test && optionalEnv("ONBOARDING_TEST_API_KEY")) || requireEnv("ONBOARDING_API_KEY")
 }
 

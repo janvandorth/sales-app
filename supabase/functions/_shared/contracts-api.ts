@@ -11,6 +11,11 @@ const ONBOARDING_URL = {
   production: "https://contracts.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper",
 }
 
+const RECRUITERS_URL = {
+  test: "http://test.zekerenmobiel.nl/Recruiters",
+  production: "https://contracts.zekerenmobiel.nl/Recruiters",
+}
+
 const STATS_URL = {
   test: "http://test.zekerenmobiel.nl/Sales/2026.1/Stats",
   production: "https://contracts.zekerenmobiel.nl/Sales/2026.1/Stats",
@@ -32,6 +37,14 @@ export function onboardingUrl(test: boolean): string {
 /** Where a sale is onboarded: test sales follow ONBOARDING_TEST_API_ENV, the others ONBOARDING_API_ENV. */
 export function onboardingEnvironment(test: boolean): "test" | "production" {
   return environment(test ? "ONBOARDING_TEST_API_ENV" : "ONBOARDING_API_ENV")
+}
+
+/**
+ * GET endpoint with ZMAdmin's active recruiters. Read from the same environment the sale is onboarded in (and with
+ * the same key), so a picked recruiter code exists where the sale lands.
+ */
+export function recruitersUrl(test: boolean): string {
+  return RECRUITERS_URL[onboardingEnvironment(test)]
 }
 
 /** GET endpoint with sales and cancellations for the dashboard. */
