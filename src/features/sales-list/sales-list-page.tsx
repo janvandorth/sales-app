@@ -19,7 +19,7 @@ import { useSalesDay } from "./use-sales-day"
 type Props = { profile: Profile | undefined; userId: string | undefined; onBack: () => void }
 
 /**
- * What was sent in, one day at a time (by the moment it was received), back to a week ago: a sanity check for the
+ * What was sent in, one day at a time (by the moment it was received), back to a month ago: a sanity check for the
  * recruiter. The sales manager sees everyone's, grouped per recruiter.
  */
 export function SalesListPage({ profile, userId, onBack }: Props) {
