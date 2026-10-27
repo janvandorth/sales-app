@@ -1,20 +1,17 @@
 import { optionalEnv } from "./env.ts"
 
-// Endpoints of the Zeker en Mobiel Contracts API. Each endpoint has its own switch, so one can go live while the
-// other stays on TEST: ONBOARDING_API_ENV and STATS_API_ENV. "production" uses contracts.zekerenmobiel.nl, unset or
-// "test" uses test.zekerenmobiel.nl. The matching *_API_KEY secret must hold the key for that environment.
-// Sales from the test deployment (test = true, see test-request.ts) have their own switch, ONBOARDING_TEST_API_ENV,
-// which defaults to TEST whatever ONBOARDING_API_ENV says.
+// Endpoints of the Zeker en Mobiel Contracts API. Onboarding has a switch, ONBOARDING_API_ENV: "production" uses
+// contracts.zekerenmobiel.nl, unset or "test" uses test.zekerenmobiel.nl, and ONBOARDING_API_KEY must hold the key
+// for that environment. Sales from the test deployment (test = true, see test-request.ts) have their own switch,
+// ONBOARDING_TEST_API_ENV, which defaults to TEST whatever ONBOARDING_API_ENV says.
+// The stats endpoint is only on TEST so far, so the dashboard always reads TEST, with STATS_API_KEY as TEST's key.
 
 const ONBOARDING_URL = {
   test: "http://test.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper",
   production: "https://contracts.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper",
 }
 
-const STATS_URL = {
-  test: "http://test.zekerenmobiel.nl/Sales/2026.1/Stats",
-  production: "https://contracts.zekerenmobiel.nl/Sales/2026.1/Stats",
-}
+const STATS_URL = "http://test.zekerenmobiel.nl/Sales/2026.1/Stats"
 
 function environment(secret: string): "test" | "production" {
   const value = optionalEnv(secret) ?? "test"
@@ -36,5 +33,5 @@ export function onboardingEnvironment(test: boolean): "test" | "production" {
 
 /** GET endpoint with sales and cancellations for the dashboard. */
 export function statsUrl(): string {
-  return STATS_URL[environment("STATS_API_ENV")]
+  return STATS_URL
 }

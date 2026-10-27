@@ -112,7 +112,8 @@ resent automatically, because the sale may have arrived; check ZMAdmin and set `
 have `sync-onboarding` resend it.
 
 **Dashboard.** Account menu → "Mijn resultaten" (recruiters) or "Resultaten team" (admins). The `kpi` function
-reads ZMAdmin through the Contracts API (`GET …/Sales/2026.1/Stats`, ZMSuite branch `Jan/feature/sales-stats`):
+reads ZMAdmin through the Contracts API on TEST (`GET http://test.zekerenmobiel.nl/Sales/2026.1/Stats`, ZMSuite
+branch `Jan/feature/sales-stats`):
 gross sales per day and recruiter, with each cancellation counted on the day of the sale, plus the cancelled
 customers with their reason. A recruiter always gets their own wervernr (which must be their ZMAdmin recruiter
 code); only admins may pick another recruiter or the whole team. "Opzeggingen bijgewerkt t/m" is the most recent
@@ -220,8 +221,7 @@ Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 | `ONBOARDING_TEST_API_ENV` | Where test sales are onboarded: `production` or unset (= test)                                      |
 | `ONBOARDING_TEST_API_KEY` | Optional key for test sales; must fit `ONBOARDING_TEST_API_ENV`                                     |
 | `TEST_ORIGINS`            | Origins of the test deployment (format as `ALLOWED_ORIGINS`, and allowed by CORS too)               |
-| `STATS_API_ENV`           | `production` or unset (= test), like `ONBOARDING_API_ENV`                                           |
-| `STATS_API_KEY`           | `X-API-Key` for the stats endpoint; without it the dashboard shows demo numbers                     |
+| `STATS_API_KEY`           | `X-API-Key` of TEST, where the stats endpoint lives; without it the dashboard shows demo numbers    |
 
 ### Recruiters
 

@@ -21,7 +21,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Profile } from "@/hooks/use-profile"
-import { SHOW_RESULTS } from "@/lib/deployment"
 import { cn } from "@/lib/utils"
 import type { OutboxItem } from "../outbox/outbox-store"
 
@@ -115,11 +114,9 @@ export function FormHeader(props: Props) {
               <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenSales}>
                 <ClipboardListIcon /> {profile?.isAdmin ? "Verkopen team" : "Mijn verkopen"}
               </DropdownMenuItem>
-              {SHOW_RESULTS && (
-                <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenDashboard}>
-                  <ChartColumnIcon /> {profile?.isAdmin ? "Resultaten team" : "Mijn resultaten"}
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenDashboard}>
+                <ChartColumnIcon /> {profile?.isAdmin ? "Resultaten team" : "Mijn resultaten"}
+              </DropdownMenuItem>
               {profile?.isAdmin && (
                 <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenAdmin}>
                   <UsersIcon /> Beheer wervers
