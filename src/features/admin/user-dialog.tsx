@@ -108,7 +108,7 @@ export function UserDialog({ user, isSelf, onClose }: Props) {
             <Field orientation="horizontal">
               <FieldContent>
                 <FieldLabel htmlFor="is-admin">Beheerder</FieldLabel>
-                <FieldDescription>Mag wervers bekijken en uitnodigen</FieldDescription>
+                <FieldDescription>Mag wervers bekijken en toevoegen</FieldDescription>
               </FieldContent>
               <Switch
                 id="is-admin"
