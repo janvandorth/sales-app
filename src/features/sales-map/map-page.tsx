@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import * as maplibregl from "maplibre-gl"
 import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
 import { ArrowLeftIcon, RefreshCwIcon } from "lucide-react"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -25,6 +26,9 @@ const PERIODS = [
 /** public/nl-pc4.geojson from scripts/build-pc4-areas.mjs, with the PC4 code in `postcode`. */
 const PC4_AREAS_URL = "/nl-pc4.geojson"
 const SOURCE = "pc4"
+
+// MapLibre looks for its worker next to its own module, which Vite moves; give it the worker's real address.
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 /**
  * Where the team sold, per PC4 area: red where the newest sale is days old, fading through yellow to grey at the
@@ -206,11 +210,8 @@ function SalesMap({ areas, names, periodDays, until }: MapProps) {
     }
   }, [areas, loaded, periodDays, until])
 
-  return (
-    <div className="relative min-h-0 flex-1">
-      <div ref={container} className="absolute inset-0" />
-    </div>
-  )
+  // The container itself fills the space: MapLibre's stylesheet makes it position: relative, so absolute won't hold.
+  return <div ref={container} className="min-h-0 flex-1" />
 }
 
 /** Built as DOM nodes rather than HTML, so a city name from ZMAdmin is never read as markup. */
