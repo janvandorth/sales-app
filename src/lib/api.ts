@@ -8,6 +8,7 @@ import {
 import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import type { KpiRequest, KpiResponse } from "@shared/kpi"
+import type { SalesMapRequest, SalesMapResponse } from "@shared/sales-map"
 import { SCANS_BUCKET } from "@shared/storage"
 import type { Recruiter } from "@shared/submission-record"
 import { IS_TEST_DEPLOYMENT, TEST_DEPLOYMENT_HEADER } from "@/lib/deployment"
@@ -113,6 +114,15 @@ export async function getKpi(request: KpiRequest): Promise<KpiResponse> {
     return { demo: true, wervernr, stats: demoSalesStats(request.from, request.to, wervernr) }
   }
   return invoke<KpiResponse>("kpi", { ...request })
+}
+
+export async function getSalesMap(request: SalesMapRequest): Promise<SalesMapResponse> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoSalesMap } = await import("@shared/sales-map-demo")
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return { demo: true, map: demoSalesMap(request.from, request.to) }
+  }
+  return invoke<SalesMapResponse>("sales-map", { ...request })
 }
 
 // --- Sales per day ------------------------------------------------------------------------------

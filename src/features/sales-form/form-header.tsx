@@ -5,6 +5,7 @@ import {
   CloudOffIcon,
   KeyRoundIcon,
   LogOutIcon,
+  MapIcon,
   RefreshCwIcon,
   UserIcon,
   UsersIcon,
@@ -35,6 +36,7 @@ type Props = {
   syncing: boolean
   onOpenOutbox: () => void
   onOpenDashboard: () => void
+  onOpenMap: () => void
   onOpenSales: () => void
   onOpenAdmin: () => void
   onChangePassword: () => void
@@ -47,7 +49,7 @@ const MENU_ITEM_CLASS = "min-h-12 gap-3 px-3 text-base [&_svg:not([class*='size-
 /** Header of the form page: camera scan, logo, offline/outbox status and the account menu. */
 export function FormHeader(props: Props) {
   const { profile, email, online, scanDisabled, onScan, outbox, syncing } = props
-  const { onOpenOutbox, onOpenDashboard, onOpenSales, onOpenAdmin, onChangePassword, onSignOut } = props
+  const { onOpenOutbox, onOpenDashboard, onOpenMap, onOpenSales, onOpenAdmin, onChangePassword, onSignOut } = props
 
   return (
     <PageHeader
@@ -116,9 +118,14 @@ export function FormHeader(props: Props) {
                 <ClipboardListIcon /> {profile?.isAdmin ? "Verkopen team" : "Mijn verkopen"}
               </DropdownMenuItem>
               {SHOW_RESULTS && (
-                <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenDashboard}>
-                  <ChartColumnIcon /> {profile?.isAdmin ? "Resultaten team" : "Mijn resultaten"}
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenDashboard}>
+                    <ChartColumnIcon /> {profile?.isAdmin ? "Resultaten team" : "Mijn resultaten"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenMap}>
+                    <MapIcon /> Verkoopkaart
+                  </DropdownMenuItem>
+                </>
               )}
               {profile?.isAdmin && (
                 <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenAdmin}>
