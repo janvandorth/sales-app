@@ -126,15 +126,13 @@ made-up numbers and the page says so. In development, open `http://localhost:517
 **Sales map.** Account menu → "Verkoopkaart", shown together with the dashboard. Everyone sees where the whole
 team sold in the last 30 days, 90 days or year, cancelled sales included. The `sales-map` function reads
 `GET http://test.zekerenmobiel.nl/Sales/2026.1/Map` with `STATS_API_KEY`: sales per full postcode, answered from the
-same in-memory cache as the stats (refreshed every 15 minutes). The app sums them to PC5 and PC4 and shows PC4
-areas for the country, PC5 from zoom 11 and PC6 from zoom 13. Colour is the age of an area's newest sale (red
-today, yellow, grey at the start of the period); darker means more sales. In development: `?demo&kaart`.
+same in-memory cache as the stats (refreshed every 15 minutes). The app sums them to PC4 areas. Colour is the age
+of an area's newest sale (red today, yellow, grey at the start of the period); darker means more sales. In
+development: `?demo&kaart`.
 
-The areas come from `nl-postcodes.pmtiles` in the public Storage bucket `postcode-tiles`, built once a year from
-CBS "Kerncijfers per postcode" (PC4, PC5 and PC6 GeoPackages) with `scripts/build-postcode-tiles.sh` on a Mac
-(`brew install gdal tippecanoe`). Upload it in the Supabase dashboard (Storage → `postcode-tiles`, public) and
-raise the bucket's file size limit if the upload refuses it. The map credits CBS and Esri Nederland for the areas
-and PDOK for the background, as their licences require.
+The areas are `public/nl-pc4.geojson` (about 2 MB, 400 kB gzipped), built from CBS postcode statistics on PDOK with
+`node scripts/build-pc4-areas.mjs <year>` when CBS publishes a new year. The map credits CBS and Esri Nederland for
+the areas and PDOK for the background, as their licences require.
 
 **Login.** Sign-ups are disabled. An admin adds a recruiter on the admin page ("Werver toevoegen"): the account is
 active at once with the password `tijdelijkwachtwoord` (`TEMPORARY_PASSWORD` in `_shared/admin-types.ts`), which

@@ -22,10 +22,7 @@ export function age(lastSoldOn: string, today: string, periodDays: number): numb
   return Math.min(1, Math.max(0, days / periodDays))
 }
 
-/**
- * Opacity for `sold` sales when the busiest area at this level has `maxSold`. On a log scale, so one busy street
- * does not wash out the rest, and per level, because a PC4 area always holds more sales than a PC6 one.
- */
+/** Opacity for `sold` sales when the busiest area has `maxSold`, on a log scale so one busy area can't dim the rest. */
 export function strength(sold: number, maxSold: number): number {
   const [low, high] = STRENGTH_RANGE
   if (maxSold <= 1) return high

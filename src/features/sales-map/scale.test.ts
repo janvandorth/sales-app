@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest"
-import { levelAt } from "./levels"
 import { age, STRENGTH_RANGE, strength } from "./scale"
 
 describe("age", () => {
@@ -28,18 +27,5 @@ describe("strength", () => {
 
   it("draws a single sale at full strength when no area has more", () => {
     expect(strength(1, 1)).toBe(high)
-  })
-})
-
-describe("levelAt", () => {
-  it.each([
-    [7, "pc4"],
-    [10.9, "pc4"],
-    [11, "pc5"],
-    [12.5, "pc5"],
-    [13, "pc6"],
-    [17, "pc6"],
-  ])("zoom %s shows %s", (zoom, level) => {
-    expect(levelAt(zoom)).toBe(level)
   })
 })

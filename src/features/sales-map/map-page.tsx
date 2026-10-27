@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import * as maplibregl from "maplibre-gl"
 import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { Protocol } from "pmtiles"
 import { ArrowLeftIcon, RefreshCwIcon } from "lucide-react"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -12,8 +11,7 @@ import { Button } from "@/components/ui/button"
 import { getSalesMap } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
 import { addDays, formatDay, today } from "../dashboard/periods"
-import { aggregate, type MapArea, type MapAreas } from "./aggregate"
-import { LEVELS, levelAt, POSTCODE_TILES_URL } from "./levels"
+import { aggregate, type MapArea } from "./aggregate"
 import { AGE_STOPS, age, ageColorExpression, strength } from "./scale"
 
 type Props = { onBack: () => void }
@@ -24,15 +22,13 @@ const PERIODS = [
   { days: 365, label: "1 jaar" },
 ] as const
 
-const SOURCE = "postcodes"
-
-// Registered once: MapLibre reads the single tile file through HTTP range requests.
-maplibregl.addProtocol("pmtiles", new Protocol().tile)
+/** public/nl-pc4.geojson from scripts/build-pc4-areas.mjs, with the PC4 code in `postcode`. */
+const PC4_AREAS_URL = "/nl-pc4.geojson"
+const SOURCE = "pc4"
 
 /**
- * Where the team sold, per postcode area: red where the newest sale is days old, fading through yellow to grey at
- * the start of the period, and darker where more was sold. PC4 areas for the country, PC5 and PC6 when zoomed in.
- * Everyone sees the whole team.
+ * Where the team sold, per PC4 area: red where the newest sale is days old, fading through yellow to grey at the
+ * start of the period, and darker where more was sold. Everyone sees the whole team.
  */
 export function SalesMapPage({ onBack }: Props) {
   const [periodDays, setPeriodDays] = useState<number>(90)
@@ -111,14 +107,13 @@ export function SalesMapPage({ onBack }: Props) {
   )
 }
 
-type MapProps = { areas: MapAreas; names: Map<string, string>; periodDays: number; until: string }
+type MapProps = { areas: Map<string, MapArea>; names: Map<string, string>; periodDays: number; until: string }
 
-/** The MapLibre map; colours are set as feature state, so new numbers never reload the tiles. */
+/** The MapLibre map; colours are set as feature state, so new numbers never reload the areas. */
 function SalesMap({ areas, names, periodDays, until }: MapProps) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const [loaded, setLoaded] = useState(false)
-  const [tilesMissing, setTilesMissing] = useState(false)
   // Read by the click handler, which is registered once.
   const latest = useRef({ areas, names })
   useEffect(() => {
@@ -127,6 +122,7 @@ function SalesMap({ areas, names, periodDays, until }: MapProps) {
 
   useEffect(() => {
     if (!container.current) return
+    const hasSales: ExpressionSpecification = ["boolean", ["feature-state", "has"], false]
     const map = new maplibregl.Map({
       container: container.current,
       center: [5.3, 52.15],
@@ -148,62 +144,45 @@ function SalesMap({ areas, names, periodDays, until }: MapProps) {
             attribution: "Achtergrond: PDOK, Kadaster",
           },
           [SOURCE]: {
-            type: "vector",
-            url: `pmtiles://${POSTCODE_TILES_URL}`,
+            type: "geojson",
+            data: PC4_AREAS_URL,
             promoteId: "postcode",
             attribution: "Postcodegebieden: CBS, Esri Nederland",
           },
         },
         layers: [
           { id: "background", type: "raster", source: "background" },
-          ...LEVELS.flatMap(({ level, minzoom, maxzoom }) => {
-            const hasSales: ExpressionSpecification = ["boolean", ["feature-state", "has"], false]
-            return [
-              {
-                id: `${level}-fill`,
-                type: "fill" as const,
-                source: SOURCE,
-                "source-layer": level,
-                minzoom,
-                maxzoom,
-                paint: {
-                  "fill-color": ageColorExpression(),
-                  "fill-opacity": ["case", hasSales, ["feature-state", "strength"], 0],
-                },
-              },
-              {
-                id: `${level}-line`,
-                type: "line" as const,
-                source: SOURCE,
-                "source-layer": level,
-                minzoom,
-                maxzoom,
-                paint: { "line-color": "#334155", "line-width": 0.5, "line-opacity": ["case", hasSales, 0.6, 0.15] },
-              },
-            ]
-          }),
-        ] as maplibregl.LayerSpecification[],
+          {
+            id: "pc4-fill",
+            type: "fill",
+            source: SOURCE,
+            paint: {
+              "fill-color": ageColorExpression(),
+              "fill-opacity": ["case", hasSales, ["feature-state", "strength"], 0],
+            },
+          },
+          {
+            id: "pc4-line",
+            type: "line",
+            source: SOURCE,
+            paint: { "line-color": "#334155", "line-width": 0.5, "line-opacity": ["case", hasSales, 0.6, 0.15] },
+          },
+        ],
       },
     })
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
     map.on("load", () => setLoaded(true))
-    map.on("error", (event) => {
-      if ("sourceId" in event && event.sourceId === SOURCE) setTilesMissing(true)
-    })
 
     const popup = new maplibregl.Popup({ closeButton: true, maxWidth: "260px" })
-    map.on("click", (event) => {
-      const level = levelAt(map.getZoom())
-      const [feature] = map.queryRenderedFeatures(event.point, { layers: [`${level}-fill`] })
-      const postcode = feature?.id === undefined ? undefined : String(feature.id)
-      const area = postcode ? latest.current.areas[level].get(postcode) : undefined
-      if (!postcode) return popup.remove()
-      popup.setLngLat(event.lngLat).setDOMContent(popupContent(postcode, area, latest.current.names)).addTo(map)
+    map.on("click", "pc4-fill", (event) => {
+      const id = event.features?.[0]?.id
+      if (id === undefined) return
+      const postcode = String(id)
+      const content = popupContent(postcode, latest.current.areas.get(postcode), latest.current.names)
+      popup.setLngLat(event.lngLat).setDOMContent(content).addTo(map)
     })
-    for (const { level } of LEVELS) {
-      map.on("mouseenter", `${level}-fill`, () => (map.getCanvas().style.cursor = "pointer"))
-      map.on("mouseleave", `${level}-fill`, () => (map.getCanvas().style.cursor = ""))
-    }
+    map.on("mouseenter", "pc4-fill", () => (map.getCanvas().style.cursor = "pointer"))
+    map.on("mouseleave", "pc4-fill", () => (map.getCanvas().style.cursor = ""))
 
     mapRef.current = map
     return () => {
@@ -217,28 +196,19 @@ function SalesMap({ areas, names, periodDays, until }: MapProps) {
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
-    for (const { level } of LEVELS) {
-      map.removeFeatureState({ source: SOURCE, sourceLayer: level })
-      const maxSold = Math.max(0, ...[...areas[level].values()].map((a) => a.sold))
-      for (const area of areas[level].values()) {
-        map.setFeatureState(
-          { source: SOURCE, sourceLayer: level, id: area.postcode },
-          { has: true, age: age(area.lastSoldOn, until, periodDays), strength: strength(area.sold, maxSold) },
-        )
-      }
+    map.removeFeatureState({ source: SOURCE })
+    const maxSold = Math.max(0, ...[...areas.values()].map((a) => a.sold))
+    for (const area of areas.values()) {
+      map.setFeatureState(
+        { source: SOURCE, id: area.postcode },
+        { has: true, age: age(area.lastSoldOn, until, periodDays), strength: strength(area.sold, maxSold) },
+      )
     }
   }, [areas, loaded, periodDays, until])
 
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={container} className="absolute inset-0" />
-      {tilesMissing && (
-        <Alert className="absolute top-3 left-3 max-w-xs">
-          <AlertDescription>
-            De postcodegebieden zijn nog niet geladen: nl-postcodes.pmtiles staat nog niet in Storage.
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
   )
 }
@@ -255,7 +225,7 @@ function popupContent(postcode: string, area: MapArea | undefined, names: Map<st
     return node
   }
 
-  add("div", `${formatPostcode(postcode)}${area?.city ? ` · ${area.city}` : ""}`, "font-semibold")
+  add("div", `${postcode}${area?.city ? ` · ${area.city}` : ""}`, "font-semibold")
   if (!area) {
     add("div", "Geen verkopen in deze periode", "text-muted-foreground")
     return root
@@ -268,11 +238,6 @@ function popupContent(postcode: string, area: MapArea | undefined, names: Map<st
     list.append(item)
   }
   return root
-}
-
-/** "1234AB" as "1234 AB"; PC4 and PC5 as they are. */
-function formatPostcode(postcode: string): string {
-  return postcode.length === 6 ? `${postcode.slice(0, 4)} ${postcode.slice(4)}` : postcode
 }
 
 /** The colour ramp in days for the chosen period, and what darkness means. */

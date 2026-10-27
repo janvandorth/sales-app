@@ -16,7 +16,7 @@ export type SalesMapRequest = z.input<typeof salesMapRequestSchema>
 /** The Contracts API's answer: every sale in the period per full postcode, cancelled ones included. */
 export const salesMapSchema = z.object({
   salesEnteredUntil: z.string().nullable(),
-  /** One row per PC6 with a sale, e.g. "1234AB". The app sums them to PC5 and PC4. */
+  /** One row per PC6 with a sale, e.g. "1234AB". The app sums them to PC4. */
   areas: z.array(
     z.object({
       postcode: z.string().regex(/^\d{4}[A-Z]{2}$/),

@@ -20,37 +20,25 @@ describe("aggregate", () => {
     area("3812AA", 4, "2026-10-05", [["1210AP", 4]]),
   ])
 
-  it("keeps the PC6 areas as they are", () => {
-    expect([...areas.pc6.keys()]).toEqual(["3811AB", "3811AC", "3811BA", "3812AA"])
-    expect(areas.pc6.get("3811AC")?.recruiters).toEqual([
-      { recruiter: "0618BB", sold: 2 },
-      { recruiter: "0212BB", sold: 1 },
-    ])
-  })
-
-  it("sums PC6 areas into PC5 by their first five characters", () => {
-    expect(areas.pc5.get("3811A")).toEqual({
-      postcode: "3811A",
+  it("sums PC6 postcodes into PC4 with the newest sale, the main city and who sold there", () => {
+    expect(areas.get("3811")).toEqual({
+      postcode: "3811",
       city: "Amersfoort",
-      sold: 5,
+      sold: 6,
       lastSoldOn: "2026-10-20",
       recruiters: [
         { recruiter: "0212BB", sold: 3 },
-        { recruiter: "0618BB", sold: 2 },
+        { recruiter: "0618BB", sold: 3 },
       ],
     })
-    expect(areas.pc5.get("3811B")?.sold).toBe(1)
   })
 
-  it("sums PC6 areas into PC4, with the newest sale and the city most sales were at", () => {
-    const pc4 = areas.pc4.get("3811")
-    expect(pc4?.sold).toBe(6)
-    expect(pc4?.lastSoldOn).toBe("2026-10-20")
-    expect(pc4?.city).toBe("Amersfoort")
-    expect([...areas.pc4.keys()]).toEqual(["3811", "3812"])
+  it("gives one area per PC4", () => {
+    expect([...areas.keys()]).toEqual(["3811", "3812"])
+    expect(areas.get("3812")?.recruiters).toEqual([{ recruiter: "1210AP", sold: 4 }])
   })
 
   it("gives no areas for no sales", () => {
-    expect(aggregate([]).pc4.size).toBe(0)
+    expect(aggregate([]).size).toBe(0)
   })
 })
