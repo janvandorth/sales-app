@@ -5,7 +5,7 @@ import { appendSheetRow, isSheetsConfigured } from "../_shared/google-sheets.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { isOnboardingConfigured, sendToOnboarding } from "../_shared/onboarding.ts"
 import { isOwnScanPath } from "../_shared/storage.ts"
-import { toSheetRow, toSubmissionRecord } from "../_shared/submission-record.ts"
+import { chooseRecruiter, toSheetRow, toSubmissionRecord } from "../_shared/submission-record.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
 import { isTestRequest } from "../_shared/test-request.ts"
 
@@ -25,13 +25,15 @@ serve(async (req) => {
   }
   const admin = createAdminClient()
 
-  // Recruiter details come from the caller's own profile, never from the request body.
-  const { data: recruiter, error: profileError } = await admin
+  // Recruiter details come from the caller's own profile; only an admin may book the sale on a werver they picked.
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .select("wervernaam, wervernr")
+    .select("wervernaam, wervernr, is_admin")
     .eq("id", user.id)
     .single()
-  if (profileError || !recruiter) throw new HttpError(403, "Geen wervers-profiel gevonden")
+  if (profileError || !profile) throw new HttpError(403, "Geen wervers-profiel gevonden")
+  if (parsed.data.werver && !profile.is_admin) console.warn(`Ignored a picked werver from non-admin ${user.id}`)
+  const recruiter = chooseRecruiter(profile, parsed.data.werver)
 
   const record = toSubmissionRecord(parsed.data, user.id, recruiter, new Date(), isTestRequest(req))
 

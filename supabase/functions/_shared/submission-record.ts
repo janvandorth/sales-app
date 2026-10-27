@@ -37,8 +37,17 @@ export type SubmissionRecord = {
 export type Recruiter = { wervernaam: string; wervernr: string }
 
 /**
- * Turns validated form values into the stored record. The user id and recruiter details come from the
- * verified caller, never from the submitted form.
+ * The recruiter a sale is booked on: the werver an admin picked on the form, otherwise the caller's own profile.
+ * Only an admin may pick; for anyone else a werver in the form is ignored.
+ */
+export function chooseRecruiter(caller: Recruiter & { is_admin: boolean }, picked: Recruiter | null): Recruiter {
+  if (caller.is_admin && picked) return { wervernaam: picked.wervernaam, wervernr: picked.wervernr }
+  return { wervernaam: caller.wervernaam, wervernr: caller.wervernr }
+}
+
+/**
+ * Turns validated form values into the stored record. The user id comes from the verified caller and the recruiter
+ * from chooseRecruiter, never straight from the submitted form.
  */
 export function toSubmissionRecord(
   values: FormValues,

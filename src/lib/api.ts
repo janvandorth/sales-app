@@ -8,6 +8,7 @@ import {
 import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import type { KpiRequest, KpiResponse } from "@shared/kpi"
+import type { ZmRecruiter } from "@shared/recruiters"
 import { SCANS_BUCKET } from "@shared/storage"
 import { IS_TEST_DEPLOYMENT, TEST_DEPLOYMENT_HEADER } from "@/lib/deployment"
 import { ApiError, AuthError, NetworkError } from "@/lib/errors"
@@ -67,6 +68,11 @@ export function validateIban(iban: string, signal?: AbortSignal) {
 
 export function submitForm(values: FormInput) {
   return invoke<{ ok: true; rowId: string; duplicate: boolean }>("submit-form", { ...values })
+}
+
+/** Admins only: ZMAdmin's active recruiters, to book a sale on someone else. */
+export function listRecruiters() {
+  return invoke<{ recruiters: ZmRecruiter[] }>("recruiters", {}).then((result) => result.recruiters)
 }
 
 /**

@@ -33,6 +33,7 @@ const validForm: FormInput = {
   betaalperiode: "Maand Machtiging",
   opmerkingen: "",
   scanPath: "",
+  werver: null,
 }
 
 const issuesFor = (overrides: Partial<FormInput>) => {
@@ -73,6 +74,17 @@ describe("formSchema", () => {
       ibanTnv: "",
       scanPath: "",
     })
+  })
+
+  it("books a form from an app without the werver picker on the caller", () => {
+    const { werver: _w, ...older } = validForm
+    expect(formSchema.safeParse(older).success).toBe(false)
+    expect(parseSubmittedForm(older).data?.werver).toBeNull()
+  })
+
+  it("requires a picked werver to have a name and a recruiter code", () => {
+    expect(issuesFor({ werver: { wervernaam: "Piet Pietersen", wervernr: "0212BB" } })).toEqual([])
+    expect(issuesFor({ werver: { wervernaam: "Piet Pietersen", wervernr: " " } })).toEqual(["werver.wervernr"])
   })
 
   it("checks the second phone number only when one is filled in", () => {

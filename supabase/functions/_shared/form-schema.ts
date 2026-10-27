@@ -138,6 +138,14 @@ export const formSchema = z
     // The scanned photo of the paper contract in the scans bucket, "" when the form was typed in. Sent along to
     // onboarding, which files it with the customer. submit-form checks that it is in the caller's own folder.
     scanPath: z.string().max(200),
+    // Admins only: the recruiter the sale is booked on, picked from ZMAdmin's list; null means the caller. submit-form
+    // ignores it for everyone else.
+    werver: z
+      .object({
+        wervernaam: z.string().trim().min(1).max(100),
+        wervernr: z.string().trim().min(1).max(50),
+      })
+      .nullable(),
   })
   .refine((values) => values.perPost || z.email().safeParse(values.email).success, {
     path: ["email"],
@@ -166,6 +174,7 @@ export const ADDED_FIELD_DEFAULTS = {
   ibanTnvZelfde: true,
   ibanTnv: "",
   scanPath: "",
+  werver: null,
 } satisfies Partial<FormInput>
 
 /** Parses a submitted form body, filling in fields an older app version does not send. */
