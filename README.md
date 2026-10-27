@@ -41,7 +41,7 @@ npm run dev
      │                                         └───────────────────────────────────▶ Contracts API onboarding
      │                                    sync-sheet (hourly, pg_cron) appends rows not in the sheet yet
      │                                    sync-onboarding (hourly, pg_cron) sends rows without an onboarding answer
-     ├─ werver picker (admins only) ────▶ recruiters ──────────────────────────────────▶ Contracts API recruiters
+     ├─ werver picker (admins only) ────▶ recruiters ──▶ profiles (not admins)
      ├─ dashboard ──────────────────────▶ kpi ─────────────────────────────────────────▶ Contracts API stats (ZMAdmin)
      └─ admin page (admins only) ───────▶ admin-users ──▶ auth admin API, profiles, profile_changes
 ```
@@ -88,8 +88,8 @@ scripts/                        check-functions.sh and repo-level tests
 **Submitting a form.** The app validates with `formSchema`, then `useOutbox().submit()` sends it to
 `submit-form`. The server validates again with the same schema, adds the recruiter from the caller's profile,
 stores the row and appends it to the sheet. An admin may book the sale on another recruiter: the form then shows a
-"Werver" picker with ZMAdmin's active recruiters (`recruiters` function, `GET …/Recruiters` from the environment the
-sale is onboarded in, with the onboarding key) and sends the pick as `werver`; `submit-form` ignores it for anyone
+"Werver" picker with the app's recruiters that are not admins (`recruiters` function, read from `profiles`) and
+sends the pick as `werver`; `submit-form` ignores it for anyone
 who is not an admin. The sale keeps the admin's `user_id`, so it shows in the admin's "Mijn verkopen". If the phone is offline or the session expired, the form goes to the
 outbox (IndexedDB) and is sent automatically later. Every form has a `rowId` generated on the phone, so sending
 it twice never creates a duplicate.
@@ -214,7 +214,7 @@ Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 | `ALLOWED_ORIGINS`         | Browser origins allowed to call the functions (comma separated, `*` wildcard)                       |
 | `CRON_SECRET`             | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret` |
 | `ONBOARDING_API_ENV`      | `production` or unset (= test); URLs are in `supabase/functions/_shared/contracts-api.ts`           |
-| `ONBOARDING_API_KEY`      | `X-API-Key` for the Contracts API onboarding endpoint (also used for the recruiter list)            |
+| `ONBOARDING_API_KEY`      | `X-API-Key` for the Contracts API onboarding endpoint                                               |
 | `ONBOARDING_TEST_API_ENV` | Where test sales are onboarded: `production` or unset (= test)                                      |
 | `ONBOARDING_TEST_API_KEY` | Optional key for test sales; must fit `ONBOARDING_TEST_API_ENV`                                     |
 | `TEST_ORIGINS`            | Origins of the test deployment (format as `ALLOWED_ORIGINS`, and allowed by CORS too)               |
