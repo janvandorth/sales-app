@@ -111,7 +111,8 @@ background (`EdgeRuntime.waitUntil`), waiting up to 60 s for the answer. A timeo
 resent automatically, because the sale may have arrived; check ZMAdmin and set `onboarding_status` back to null to
 have `sync-onboarding` resend it.
 
-**Dashboard.** Account menu → "Mijn resultaten" (recruiters) or "Resultaten team" (admins). The `kpi` function
+**Dashboard.** Account menu → "Mijn resultaten" (recruiters) or "Resultaten team" (admins), only on the test
+deployment and in development for now. The `kpi` function
 reads ZMAdmin through the Contracts API on TEST (`GET http://test.zekerenmobiel.nl/Sales/2026.1/Stats`, ZMSuite
 branch `Jan/feature/sales-stats`):
 gross sales per day and recruiter, with each cancellation counted on the day of the sale, plus the cancelled
