@@ -58,11 +58,14 @@ const CONTRACT_TYPE_CODES: Record<string, string> = { Service: "S", Zakelijk: "Z
  * First letter = JenK (period), second = AenM (machtiging or acceptgiro), as ZMAdmin's ContractType. These differ
  * from the sheet's codes: Zeker en Mobiel's quarterly product is "B - M * NIEUW Jaar/Kwartaal" (JenK "B"); "KM"
  * matches no contract type. See ContractTypeSelectorTests in ZMSuite for the periods the endpoint resolves.
+ * "ZM" resolves to "Z - M * 2023 Zakelijk" (€245), the one current business machtiging (ZMAdmin test database,
+ * 2026-10-27). The acceptgiro codes are no longer offered but kept for sales sent before.
  */
 const BETAALPERIODE_CODES: Record<string, string> = {
   "Maand Machtiging": "MM",
   "Jaar Machtiging": "JM",
   "Kwartaal Machtiging": "BM",
+  "Zakelijk Jaar Machtiging": "ZM",
   "Jaar Acceptgiro": "JA",
   "Zakelijk Acceptgiro": "ZA",
 }

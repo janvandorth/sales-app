@@ -57,6 +57,16 @@ describe("toOnboardingRequest", () => {
     })
   })
 
+  it.each([
+    ["Maand Machtiging", "MM"],
+    ["Kwartaal Machtiging", "BM"],
+    ["Jaar Machtiging", "JM"],
+    ["Zakelijk Jaar Machtiging", "ZM"],
+    ["Jaar Acceptgiro", "JA"], // no longer offered, but a queued sale may still carry it
+  ])("sends %s as Betaalperiode %s", (betaalperiode, code) => {
+    expect(toOnboardingRequest({ ...record, betaalperiode }).Entry.AnswersJson.page1.Betaalperiode).toBe(code)
+  })
+
   it("sends no email for a customer who gets their mail by post", () => {
     expect(toOnboardingRequest({ ...record, email: "Per post" }).Entry.AnswersJson.page1.Email).toBe("")
   })

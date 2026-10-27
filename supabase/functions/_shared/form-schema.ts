@@ -9,11 +9,16 @@ export const CONTRACT_TYPE_OPTIONS = ["Service", "Zakelijk"] as const
 
 export const BETAALPERIODE_OPTIONS = [
   "Maand Machtiging",
-  "Jaar Machtiging",
   "Kwartaal Machtiging",
-  "Jaar Acceptgiro",
-  "Zakelijk Acceptgiro",
+  "Jaar Machtiging",
+  "Zakelijk Jaar Machtiging",
 ] as const
+
+/**
+ * No longer offered, but still accepted: a sale queued in the outbox, or sent by an app that has not reloaded
+ * since, may carry one. Onboarding and the sheet still know their codes.
+ */
+export const LEGACY_BETAALPERIODE_OPTIONS = ["Jaar Acceptgiro", "Zakelijk Acceptgiro"] as const
 
 export const PER_POST_EMAIL = "Per post"
 
@@ -132,7 +137,7 @@ export const formSchema = z
       .enum([...CONTRACT_TYPE_OPTIONS, ""], { error: "Kies een contracttype" })
       .transform(requireChoice("Kies een contracttype")),
     betaalperiode: z
-      .enum([...BETAALPERIODE_OPTIONS, ""], { error: "Kies een betaaltermijn" })
+      .enum([...BETAALPERIODE_OPTIONS, ...LEGACY_BETAALPERIODE_OPTIONS, ""], { error: "Kies een betaaltermijn" })
       .transform(requireChoice("Kies een betaaltermijn")),
     opmerkingen: z.string().trim().max(2000),
     // The scanned photo of the paper contract in the scans bucket, "" when the form was typed in. Sent along to

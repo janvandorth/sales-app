@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  BETAALPERIODE_OPTIONS,
   formSchema,
   isValidIbanChecksum,
   parseSubmittedForm,
@@ -63,6 +64,19 @@ describe("formSchema", () => {
       "contractType",
       "betaalperiode",
     ])
+  })
+
+  it("offers the payment terms in the order maand, kwartaal, jaar, zakelijk jaar", () => {
+    expect(BETAALPERIODE_OPTIONS).toEqual([
+      "Maand Machtiging",
+      "Kwartaal Machtiging",
+      "Jaar Machtiging",
+      "Zakelijk Jaar Machtiging",
+    ])
+  })
+
+  it("still accepts an acceptgiro from a sale queued before they were taken off the form", () => {
+    expect(issuesFor({ betaalperiode: "Zakelijk Acceptgiro" })).toEqual([])
   })
 
   it("accepts a form from an older app version without the second phone number, account holder and scan", () => {
