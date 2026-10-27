@@ -121,7 +121,9 @@ app loads a year at a time going back ("Eerder"). Without `STATS_API_KEY` the fu
 made-up numbers and the page says so. In development, open `http://localhost:5173/?demo` (sales manager) or
 `?demo=werver` to see the dashboard with demo data without logging in.
 
-**Login.** Accounts are invite-only (sign-ups are disabled). An invite or password-reset email opens the app on
+**Login.** Sign-ups are disabled. An admin adds a recruiter on the admin page ("Werver toevoegen"): the account is
+active at once with the password `tijdelijkwachtwoord` (`TEMPORARY_PASSWORD` in `_shared/admin-types.ts`), which
+the recruiter changes from the account menu; no email is sent. Accounts invited by email before that still work. An invite or password-reset email opens the app on
 the set-password screen. If the server rejects a session (e.g. revoked), the app refreshes it once and
 otherwise signs out on that device only.
 

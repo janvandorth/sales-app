@@ -198,8 +198,7 @@ export type AdminProfileInput = { wervernaam: string; wervernr: string; isAdmin:
 
 export const adminApi = {
   list: () => invoke<{ users: AdminUser[] }>("admin-users", { action: "list" }).then((result) => result.users),
-  invite: (email: string, profile: AdminProfileInput) =>
-    invoke("admin-users", { action: "invite", email, redirectTo: window.location.origin, ...profile }),
+  invite: (email: string, profile: AdminProfileInput) => invoke("admin-users", { action: "invite", email, ...profile }),
   update: (id: string, profile: AdminProfileInput) => invoke("admin-users", { action: "update", id, ...profile }),
   resendInvite: (id: string) =>
     invoke("admin-users", { action: "resendInvite", id, redirectTo: window.location.origin }),

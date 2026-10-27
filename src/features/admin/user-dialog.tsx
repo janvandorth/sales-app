@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { toast } from "sonner"
-import type { AdminUser } from "@shared/admin-types"
+import { TEMPORARY_PASSWORD, type AdminUser } from "@shared/admin-types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,14 +20,14 @@ import { getErrorMessage } from "@/lib/errors"
 import { useAdminAction } from "./use-admin-users"
 
 type Props = {
-  /** The recruiter to edit, or null to invite a new one. */
+  /** The recruiter to edit, or null to add a new one. */
   user: AdminUser | null
   isSelf: boolean
   onClose: () => void
 }
 
 /**
- * Invite or edit a recruiter. Mounted only while open (and keyed by user), so its state starts fresh
+ * Add or edit a recruiter. Mounted only while open (and keyed by user), so its state starts fresh
  * every time it opens.
  */
 export function UserDialog({ user, isSelf, onClose }: Props) {
@@ -47,7 +47,9 @@ export function UserDialog({ user, isSelf, onClose }: Props) {
     event.preventDefault()
     save.mutate(undefined, {
       onSuccess: () => {
-        toast.success(user ? "Wijzigingen opgeslagen" : `Uitnodiging verstuurd naar ${email.trim()}`)
+        toast.success(
+          user ? "Wijzigingen opgeslagen" : `${email.trim()} kan nu inloggen met wachtwoord ${TEMPORARY_PASSWORD}`,
+        )
         onClose()
       },
     })
@@ -58,9 +60,11 @@ export function UserDialog({ user, isSelf, onClose }: Props) {
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{user ? "Werver bewerken" : "Werver uitnodigen"}</DialogTitle>
+            <DialogTitle>{user ? "Werver bewerken" : "Werver toevoegen"}</DialogTitle>
             <DialogDescription>
-              {user ? user.email : "De werver ontvangt een e-mail met een link om een wachtwoord in te stellen."}
+              {user
+                ? user.email
+                : `De werver kan meteen inloggen met wachtwoord ${TEMPORARY_PASSWORD} en wijzigt het daarna via het accountmenu. Er gaat geen e-mail uit.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -132,7 +136,7 @@ export function UserDialog({ user, isSelf, onClose }: Props) {
             </Button>
             <Button type="submit" disabled={save.isPending}>
               {save.isPending && <Spinner />}
-              {user ? "Opslaan" : "Uitnodiging versturen"}
+              {user ? "Opslaan" : "Toevoegen"}
             </Button>
           </DialogFooter>
         </form>

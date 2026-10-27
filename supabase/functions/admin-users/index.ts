@@ -1,6 +1,6 @@
 import type { User } from "@supabase/supabase-js"
 import { z } from "zod"
-import type { AdminUser } from "../_shared/admin-types.ts"
+import { TEMPORARY_PASSWORD, type AdminUser } from "../_shared/admin-types.ts"
 import { requireUser } from "../_shared/auth.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
 import { createAdminClient } from "../_shared/supabase.ts"
@@ -18,7 +18,6 @@ const requestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("invite"),
     email: z.email("Ongeldig e-mailadres"),
-    redirectTo: z.url(),
     ...profileFields,
   }),
   z.object({ action: z.literal("update"), id: z.uuid(), ...profileFields }),
@@ -45,9 +44,12 @@ serve(async (req) => {
       return json({ users: await listUsers() })
 
     case "invite": {
-      const { data, error } = await admin.auth.admin.inviteUserByEmail(body.email, {
-        data: { wervernaam: body.wervernaam, wervernr: body.wervernr },
-        redirectTo: body.redirectTo,
+      // No email: the account is active at once with the temporary password, which the admin passes on.
+      const { data, error } = await admin.auth.admin.createUser({
+        email: body.email,
+        password: TEMPORARY_PASSWORD,
+        email_confirm: true,
+        user_metadata: { wervernaam: body.wervernaam, wervernr: body.wervernr },
       })
       if (error?.code === "email_exists") throw new HttpError(409, "Er bestaat al een gebruiker met dit e-mailadres")
       if (error) throw new HttpError(400, error.message)

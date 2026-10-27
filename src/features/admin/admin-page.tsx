@@ -67,7 +67,7 @@ export function AdminPage({ currentUserId, onBack }: Props) {
             {users.data ? `${users.data.length} gebruiker${users.data.length === 1 ? "" : "s"}` : "Laden…"}
           </p>
           <Button onClick={() => setDialogUser(null)}>
-            <UserPlusIcon /> Werver uitnodigen
+            <UserPlusIcon /> Werver toevoegen
           </Button>
         </div>
 
