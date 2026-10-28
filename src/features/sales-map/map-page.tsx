@@ -32,7 +32,18 @@ import {
   type PickedArea,
 } from "../areas/areas"
 import { AssignPanel } from "../areas/assign-panel"
-import { addHatch, applyOverlay, geometryBounds, overlayLayers, type Overlay } from "../areas/map-overlay"
+import {
+  addHatch,
+  applyOverlay,
+  codeAt,
+  geometryBounds,
+  overlayLayers,
+  pickLevel,
+  setHover,
+  sourceBounds,
+  type Overlay,
+  type PickChoice,
+} from "../areas/map-overlay"
 import { useAreaAssignments, useCreateAreaAssignment, useRecruiters } from "../areas/use-areas"
 import { addDays, formatDay, today } from "../dashboard/periods"
 import { AGE_STOPS, fillColor, fillOpacity, KANSEN_COLORS, STREET_OPACITY } from "./scale"
@@ -179,6 +190,7 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
   )
   const [chosen, setChosen] = useState<string[]>(assign?.wervernr ? [assign.wervernr] : [])
   const [picked, setPicked] = useState<PickedArea[]>([])
+  const [pickAt, setPickAt] = useState<PickChoice>("zoom")
   const [note, setNote] = useState("")
   const [naming, setNaming] = useState(false)
   const recruiters = useRecruiters(assigning)
@@ -298,11 +310,12 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
   useEffect(() => {
     popup.current = {
       // Giving out areas, a tap picks the area with what is known of it now, so its numbers survive panning away.
+      pickAt,
       pick: assigning
         ? (postcode, at, bounds) => {
             const area = (at === "pc4" ? kansenAreas.get(postcode) : current[at].get(postcode)) as
               OpportunityArea | OpportunityDetail | undefined
-            const kansenKnown = at === "pc4" ? opportunities !== undefined : current[at].size > 0
+            const kansenKnown = at === "pc4" ? opportunities !== undefined : at === shown && current[at].size > 0
             const salesKnown = at === "pc4" ? salesYear.data !== undefined : yearDetail?.level === at
             const sale = at === "pc4" ? yearAreas.get(postcode) : yearStreets.get(postcode)
             setPicked((before) =>
@@ -314,6 +327,13 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
                 lastSold: sale ? sale.lastSoldOn : salesKnown ? null : undefined,
               }),
             )
+            // A whole PC5 picked while zoomed in on streets: its numbers are asked for that area alone.
+            // Kept on it only if it is still picked when they arrive.
+            if (at === "pc5" && at !== shown) {
+              void pc5Numbers(postcode, bounds, woz, yearFrom, until).then((numbers) =>
+                setPicked((now) => now.map((p) => (p.code === postcode ? { ...p, ...numbers } : p))),
+              )
+            }
           }
         : undefined,
       area:
@@ -341,6 +361,10 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
     woz,
     current,
     assigning,
+    pickAt,
+    shown,
+    yearFrom,
+    until,
     opportunities,
     salesYear.data,
     yearAreas,
@@ -387,6 +411,18 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
           value={mode}
           onChange={setMode}
         />
+        {assigning && (
+          <Choice
+            label="Selecteren"
+            options={[
+              { value: "zoom", label: "Per zoom" },
+              { value: "pc5", label: "Hele PC5" },
+              { value: "pc4", label: "Hele PC4" },
+            ]}
+            value={pickAt}
+            onChange={setPickAt}
+          />
+        )}
         {focus && !assigning && (
           <Badge className="border-orange-600 bg-orange-50 text-orange-800">{areaTitle(focus)}</Badge>
         )}
@@ -496,6 +532,28 @@ async function fetchSalesMap(from: string, to: string) {
   return response
 }
 
+/**
+ * The "kansen" numbers and the last sale in a year of one PC5, asked for its own box. Whatever does not arrive stays
+ * unknown.
+ */
+async function pc5Numbers(code: string, bounds: Bounds, woz: WozBand, from: string, to: string) {
+  const bbox = bounds.map((n) => n.toFixed(4)).join(",")
+  const [kansen, sales] = await Promise.allSettled([
+    getSalesOpportunities({ action: "pc5", woz, bbox }),
+    fetchSalesDetail(from, to, bbox, "pc5"),
+  ])
+  const numbers: Partial<PickedArea> & { code: string } = { code }
+  if (kansen.status === "fulfilled" && kansen.value.action === "pc5") {
+    const area = kansen.value.view.areas.find((a) => a.postcode === code)
+    numbers.households = area?.households
+    numbers.open = area?.open ?? 0
+  }
+  if (sales.status === "fulfilled" && sales.value) {
+    numbers.lastSold = sales.value.areas.find((a) => a.postcode === code)?.lastSoldOn ?? null
+  }
+  return numbers
+}
+
 async function fetchSalesDetail(from: string, to: string, bbox: string, level: "pc5" | "pc6") {
   const response = await getSalesMap({ from, to, bbox, level })
   return "detail" in response ? response.detail : undefined
@@ -506,6 +564,8 @@ type PopupFor = {
   detail: (postcode: string, level: "pc5" | "pc6") => HTMLElement | null
   /** Set while giving out areas: a tap picks or drops the area under it instead of explaining it. */
   pick?: (postcode: string, level: Level, bounds: Bounds) => void
+  /** The level a tap picks at, when larger than the map's. */
+  pickAt?: PickChoice
 }
 
 type MapProps = {
@@ -667,13 +727,33 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
     })
 
     const info = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
+    // Giving out areas: the area a tap would pick at a point, at the zoom's level or the larger one chosen.
+    const target = (point: maplibregl.PointLike) => {
+      const shownLevel = shownRef.current
+      const [feature] = map.queryRenderedFeatures(point, { layers: [`${shownLevel}-fill`] })
+      if (feature?.id === undefined) return null
+      const at = pickLevel(shownLevel, popup.current.pickAt ?? "zoom")
+      return { feature, at, code: codeAt(String(feature.id), at), own: at === shownLevel }
+    }
+    let hovered: string | null = null
+    const hover = (code: string | null) => {
+      if (code === hovered) return
+      hovered = code
+      setHover(map, LEVELS, code)
+      map.getCanvas().style.cursor = code ? "pointer" : ""
+    }
+    map.on("mousemove", (event) => hover(popup.current.pick ? (target(event.point)?.code ?? null) : null))
+    map.on("mouseout", () => hover(null))
+
     map.on("click", (event) => {
       const level = shownRef.current
       const pick = popup.current.pick
       if (pick) {
         info.remove()
-        const [feature] = map.queryRenderedFeatures(event.point, { layers: [`${level}-fill`] })
-        if (feature?.id !== undefined) pick(String(feature.id), level, geometryBounds(feature.geometry))
+        const hit = target(event.point)
+        if (!hit) return
+        const own = geometryBounds(hit.feature.geometry)
+        pick(hit.code, hit.at, hit.own ? own : (sourceBounds(map, hit.at, hit.code) ?? own))
         return
       }
       if (level !== "pc4") {
@@ -688,8 +768,12 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
         .setDOMContent(popup.current.area(String(area.id)))
         .addTo(map)
     })
-    map.on("mouseenter", "pc4-fill", () => (map.getCanvas().style.cursor = "pointer"))
-    map.on("mouseleave", "pc4-fill", () => (map.getCanvas().style.cursor = ""))
+    map.on("mouseenter", "pc4-fill", () => {
+      if (!popup.current.pick) map.getCanvas().style.cursor = "pointer"
+    })
+    map.on("mouseleave", "pc4-fill", () => {
+      if (!popup.current.pick) map.getCanvas().style.cursor = ""
+    })
 
     mapRef.current = map
     return () => {

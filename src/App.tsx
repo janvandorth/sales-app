@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from "react"
 import { Toaster } from "@/components/ui/sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { AdminPage } from "@/features/admin/admin-page"
-import type { AreaAssignment, AssignStart } from "@/features/areas/areas"
+import type { AreaAssignment, AreaMember, AssignStart } from "@/features/areas/areas"
 import { MyAreasPage } from "@/features/areas/my-areas-page"
 import { PlanningPage } from "@/features/areas/planning-page"
 import { LoginPage } from "@/features/auth/login-page"
@@ -43,6 +43,8 @@ export default function App() {
   const { session, loading, needsPassword, isInvite, passwordSet } = useSession()
   const [view, setView] = useState<View>(() => (import.meta.env.DEV && DEMO_MODE ? demoView() : "form"))
   const [mapStart, setMapStart] = useState<MapStart>({ back: "form", key: 0 })
+  /** The werver whose areas a manager opened from the planning; null for one's own. */
+  const [viewedAs, setViewedAs] = useState<AreaMember | null>(null)
   const profile = useProfile(session?.user.id)
 
   const openMap = (start: Omit<MapStart, "key">) => {
@@ -71,14 +73,22 @@ export default function App() {
           onBack={() => setView("form")}
           onAssign={(assign) => openMap({ assign, back: "planning" })}
           onShow={(focus) => openMap({ focus, back: "planning" })}
+          onViewAs={(werver) => {
+            setViewedAs(werver)
+            setView("areas")
+          }}
         />
       )
     }
     if (view === "areas") {
       return (
         <MyAreasPage
-          wervernr={profile?.wervernr}
-          onBack={() => setView("form")}
+          wervernr={viewedAs?.wervernr ?? profile?.wervernr}
+          viewedAs={viewedAs?.name}
+          onBack={() => {
+            setView(viewedAs ? "planning" : "form")
+            setViewedAs(null)
+          }}
           onShow={(focus) => openMap({ focus, back: "areas" })}
         />
       )

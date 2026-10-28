@@ -5,7 +5,7 @@ import type {
   MapGeoJSONFeature,
   Map as MapLibreMap,
 } from "maplibre-gl"
-import { partlyPicked, type Bounds } from "./areas"
+import { partlyPicked, unionBounds, type Bounds } from "./areas"
 
 /**
  * The areas drawn over the shades: those given out to someone else in the chosen period (hatched), the selection
@@ -14,6 +14,21 @@ import { partlyPicked, type Bounds } from "./areas"
  */
 
 export type Overlay = { picked: string[]; taken: string[] }
+
+export type PostcodeLevel = "pc4" | "pc5" | "pc6"
+
+/** What a tap picks: the area at the zoom's level, or always the PC5 or PC4 around it. */
+export type PickChoice = "zoom" | "pc5" | "pc4"
+
+const CODE_LENGTH: Record<PostcodeLevel, number> = { pc4: 4, pc5: 5, pc6: 6 }
+
+/** The level a tap picks at: the chosen one when it is larger than what the map shows, else the map's. */
+export function pickLevel(shown: PostcodeLevel, choice: PickChoice): PostcodeLevel {
+  return choice !== "zoom" && CODE_LENGTH[choice] < CODE_LENGTH[shown] ? choice : shown
+}
+
+/** The code at `level` of the area that holds `postcode`: "3561AC" at PC5 is "3561A". */
+export const codeAt = (postcode: string, level: PostcodeLevel) => postcode.slice(0, CODE_LENGTH[level])
 
 export const PICKED_COLOR = "#ea580c"
 
@@ -47,6 +62,8 @@ export function overlayLayers(level: string, minzoom: number, maxzoom: number): 
       type: "line",
       paint: { "line-color": PICKED_COLOR, "line-width": 2, "line-dasharray": [2, 1.5] },
     },
+    // The area a tap would pick, under the mouse.
+    { ...base, id: `${level}-hover`, type: "fill", paint: { "fill-color": PICKED_COLOR, "fill-opacity": 0.3 } },
     { ...base, id: `${level}-picked`, type: "line", paint: { "line-color": PICKED_COLOR, "line-width": 3.5 } },
   ]
 }
@@ -55,7 +72,7 @@ export function overlayLayers(level: string, minzoom: number, maxzoom: number): 
  * Points every level's overlay at the current selection and the areas taken. A picked code is outlined by its own
  * level's layer only: zoomed in, a picked PC4 shows as one border, not as every street in it.
  */
-export function applyOverlay(map: MapLibreMap, levels: readonly ("pc4" | "pc5" | "pc6")[], overlay: Overlay): void {
+export function applyOverlay(map: MapLibreMap, levels: readonly PostcodeLevel[], overlay: Overlay): void {
   const part = partlyPicked(overlay.picked)
   for (const level of levels) {
     const length = Number(level.slice(2)) // "pc5" → 5
@@ -63,6 +80,22 @@ export function applyOverlay(map: MapLibreMap, levels: readonly ("pc4" | "pc5" |
     map.setFilter(`${level}-part`, oneOf(part))
     map.setFilter(`${level}-picked`, oneOf(overlay.picked.filter((c) => c.length === length)))
   }
+}
+
+/** Fills `code` on its own level's layer, the area a tap would pick; null clears it. */
+export function setHover(map: MapLibreMap, levels: readonly PostcodeLevel[], code: string | null): void {
+  for (const level of levels) {
+    map.setFilter(`${level}-hover`, oneOf(code?.length === CODE_LENGTH[level] ? [code] : []))
+  }
+}
+
+/**
+ * The box around `code` from its level's loaded tiles: a larger area picked while zoomed in on a street. Its
+ * source is loaded at every zoom from its own, since its overlay layers are always on. Null when not loaded.
+ */
+export function sourceBounds(map: MapLibreMap, level: PostcodeLevel, code: string): Bounds | null {
+  const parts = map.querySourceFeatures(level, { sourceLayer: level, filter: ["==", POSTCODE, code] })
+  return unionBounds(parts.map((part) => geometryBounds(part.geometry)))
 }
 
 /** The box around a tapped feature's shape (as far as its tile holds it, which is near enough to open a map on). */

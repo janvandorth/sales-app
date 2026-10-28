@@ -38,6 +38,7 @@ import {
   tooBig,
   weekday,
   type AreaAssignment,
+  type AreaMember,
   type AssignStart,
 } from "./areas"
 import { useAreaAssignments, useDeleteAreaAssignment, useRecruiters } from "./use-areas"
@@ -48,6 +49,8 @@ type Props = {
   onAssign: (start: AssignStart) => void
   /** Opens the map on an area. */
   onShow: (area: AreaAssignment) => void
+  /** Opens a werver's own list of areas, as they see it. */
+  onViewAs: (werver: AreaMember) => void
 }
 
 /** Monday to Saturday. */
@@ -57,7 +60,7 @@ const DAYS = 6
  * The sales manager's week: per day who works where, and who has nothing yet. A day's count says how many wervers
  * have an area that day, so a gap shows before the day is picked.
  */
-export function PlanningPage({ onBack, onAssign, onShow }: Props) {
+export function PlanningPage({ onBack, onAssign, onShow, onViewAs }: Props) {
   const now = today()
   const [monday, setMonday] = useState(periodStart(now, "week"))
   const days = Array.from({ length: DAYS }, (_, i) => addDays(monday, i))
@@ -150,7 +153,7 @@ export function PlanningPage({ onBack, onAssign, onShow }: Props) {
           </div>
         )}
         {onDay(day).map((area) => (
-          <AreaCard key={area.id} area={area} onShow={() => onShow(area)} />
+          <AreaCard key={area.id} area={area} onShow={() => onShow(area)} onViewAs={onViewAs} />
         ))}
         {day >= now &&
           free.map((r) => (
@@ -158,7 +161,7 @@ export function PlanningPage({ onBack, onAssign, onShow }: Props) {
               key={r.wervernr}
               className="flex items-center justify-between rounded-xl border border-dashed bg-background px-4 py-3"
             >
-              <span className="font-semibold">{firstName(r.wervernaam)}</span>
+              <WerverName werver={{ wervernr: r.wervernr, name: r.wervernaam }} onViewAs={onViewAs} />
               <Button
                 variant="outline"
                 size="sm"
@@ -179,14 +182,23 @@ export function PlanningPage({ onBack, onAssign, onShow }: Props) {
   )
 }
 
-function AreaCard({ area, onShow }: { area: AreaAssignment; onShow: () => void }) {
+type AreaCardProps = { area: AreaAssignment; onShow: () => void; onViewAs: (werver: AreaMember) => void }
+
+function AreaCard({ area, onShow, onViewAs }: AreaCardProps) {
   const remove = useDeleteAreaAssignment()
   const needs = tooBig(area)
   const days = area.startsOn === area.endsOn ? null : spanLabel(area.startsOn, area.endsOn, true)
   return (
     <div className="space-y-1.5 rounded-xl border bg-background px-4 py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold">{area.members.map((m) => firstName(m.name)).join(" + ")}</span>
+        <span className="flex flex-wrap items-center gap-x-1">
+          {area.members.map((m, i) => (
+            <span key={m.wervernr} className="flex items-center gap-x-1">
+              {i > 0 && <span className="font-semibold">+</span>}
+              <WerverName werver={m} onViewAs={onViewAs} />
+            </span>
+          ))}
+        </span>
         {days && <Badge variant="secondary">{days}</Badge>}
       </div>
       <div className="text-sm">
@@ -235,5 +247,19 @@ function AreaCard({ area, onShow }: { area: AreaAssignment; onShow: () => void }
         </p>
       )}
     </div>
+  )
+}
+
+/** A werver's first name; tapping it shows their list of areas as they see it. */
+function WerverName({ werver, onViewAs }: { werver: AreaMember; onViewAs: (werver: AreaMember) => void }) {
+  return (
+    <button
+      type="button"
+      className="font-semibold underline-offset-4 hover:underline"
+      aria-label={`Gebieden van ${werver.name}`}
+      onClick={() => onViewAs(werver)}
+    >
+      {firstName(werver.name)}
+    </button>
   )
 }
