@@ -449,6 +449,9 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }
       },
     })
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
+    // A trackpad pinch arrives as scroll events at this rate (MapLibre's default is 1/100): twice as fast, so a few
+    // pinches reach the streets. The mouse wheel and touch pinch keep their own speed.
+    map.scrollZoom.setZoomRate(1 / 50)
     map.on("load", () => setLoaded(true))
 
     // Say at once when zooming crosses into another level: one comparison per frame, and the page only hears of a
