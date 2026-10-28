@@ -26,12 +26,14 @@ type Props = {
   session: Session
   onOpenDashboard: () => void
   onOpenMap: () => void
+  /** The planning for an admin, Mijn gebieden for a werver. */
+  onOpenAreas: () => void
   onOpenSales: () => void
   onOpenAdmin: () => void
 }
 
 /** Main page after login: header, the sales form, the outbox dialog and the scan overlay. */
-export function FormPage({ session, onOpenDashboard, onOpenMap, onOpenSales, onOpenAdmin }: Props) {
+export function FormPage({ session, onOpenDashboard, onOpenMap, onOpenAreas, onOpenSales, onOpenAdmin }: Props) {
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
@@ -110,6 +112,7 @@ export function FormPage({ session, onOpenDashboard, onOpenMap, onOpenSales, onO
         onOpenOutbox={() => setOutboxOpen(true)}
         onOpenDashboard={onOpenDashboard}
         onOpenMap={onOpenMap}
+        onOpenAreas={onOpenAreas}
         onOpenSales={onOpenSales}
         onOpenAdmin={onOpenAdmin}
         onChangePassword={() => setChangingPassword(true)}

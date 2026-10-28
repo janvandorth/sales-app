@@ -1,4 +1,5 @@
 import {
+  CalendarDaysIcon,
   ChartColumnIcon,
   CameraIcon,
   ClipboardListIcon,
@@ -6,6 +7,7 @@ import {
   KeyRoundIcon,
   LogOutIcon,
   MapIcon,
+  MapPinnedIcon,
   RefreshCwIcon,
   UserIcon,
   UsersIcon,
@@ -22,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Profile } from "@/hooks/use-profile"
-import { SHOW_RESULTS } from "@/lib/deployment"
+import { SHOW_AREAS, SHOW_RESULTS } from "@/lib/deployment"
 import { cn } from "@/lib/utils"
 import type { OutboxItem } from "../outbox/outbox-store"
 
@@ -37,6 +39,7 @@ type Props = {
   onOpenOutbox: () => void
   onOpenDashboard: () => void
   onOpenMap: () => void
+  onOpenAreas: () => void
   onOpenSales: () => void
   onOpenAdmin: () => void
   onChangePassword: () => void
@@ -49,7 +52,16 @@ const MENU_ITEM_CLASS = "min-h-12 gap-3 px-3 text-base [&_svg:not([class*='size-
 /** Header of the form page: camera scan, logo, offline/outbox status and the account menu. */
 export function FormHeader(props: Props) {
   const { profile, email, online, scanDisabled, onScan, outbox, syncing } = props
-  const { onOpenOutbox, onOpenDashboard, onOpenMap, onOpenSales, onOpenAdmin, onChangePassword, onSignOut } = props
+  const {
+    onOpenOutbox,
+    onOpenDashboard,
+    onOpenMap,
+    onOpenAreas,
+    onOpenSales,
+    onOpenAdmin,
+    onChangePassword,
+    onSignOut,
+  } = props
 
   return (
     <PageHeader
@@ -126,6 +138,19 @@ export function FormHeader(props: Props) {
                     <MapIcon /> Verkoopkaart
                   </DropdownMenuItem>
                 </>
+              )}
+              {SHOW_AREAS && (
+                <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenAreas}>
+                  {profile?.isAdmin ? (
+                    <>
+                      <CalendarDaysIcon /> Planning
+                    </>
+                  ) : (
+                    <>
+                      <MapPinnedIcon /> Mijn gebieden
+                    </>
+                  )}
+                </DropdownMenuItem>
               )}
               {profile?.isAdmin && (
                 <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={onOpenAdmin}>

@@ -6,20 +6,49 @@ import "maplibre-gl/dist/maplibre-gl.css"
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
 import { Protocol } from "pmtiles"
 import { ArrowLeftIcon, RefreshCwIcon, ZoomInIcon } from "lucide-react"
+import { toast } from "sonner"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { getSalesMap, getSalesOpportunities } from "@/lib/api"
+import { getSalesMap, getSalesOpportunities, lookupPlace } from "@/lib/api"
+import { SHOW_AREAS } from "@/lib/deployment"
 import { getErrorMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
 import type { DetailView, MapArea, SalesStreet } from "@shared/sales-map-view"
 import type { OpportunitiesView, OpportunityArea, OpportunityDetail, WozBand } from "@shared/sales-opportunities"
+import {
+  areaTitle,
+  firstName,
+  centreOf,
+  overlaps,
+  periodsFor,
+  pickArea,
+  summarize,
+  unionBounds,
+  type AreaAssignment,
+  type AssignStart,
+  type Bounds,
+  type PickedArea,
+} from "../areas/areas"
+import { AssignPanel } from "../areas/assign-panel"
+import { addHatch, applyOverlay, geometryBounds, overlayLayers, type Overlay } from "../areas/map-overlay"
+import { useAreaAssignments, useCreateAreaAssignment, useRecruiters } from "../areas/use-areas"
 import { addDays, formatDay, today } from "../dashboard/periods"
 import { AGE_STOPS, fillColor, fillOpacity, KANSEN_COLORS, STREET_OPACITY } from "./scale"
 
-type Props = { onBack: () => void }
-type Mode = "sales" | "kansen"
+type Props = {
+  onBack: () => void
+  /** Admins may give out areas: the map gets a "Toewijzen" view. */
+  isAdmin?: boolean
+  /** Opens on "Toewijzen", for this werver and these days when given (from the planning). */
+  assign?: AssignStart
+  /** Opens on this area, outlined: a werver's own. */
+  focus?: AreaAssignment
+}
+/** "Toewijzen" is "Kansen" with the areas given out over it and a tap picking areas instead of explaining them. */
+type Mode = "sales" | "kansen" | "assign"
+type Shading = Exclude<Mode, "assign">
 type Level = "pc4" | "pc5" | "pc6"
 type Detail = SalesStreet | OpportunityDetail
 
@@ -94,8 +123,9 @@ function withDetail(seen: Seen, detail: DetailView<Detail> | undefined): Seen {
  * only says what each postcode is coloured by. Only admins also get the numbers, which the backend leaves out for
  * recruiters.
  */
-export function SalesMapPage({ onBack }: Props) {
-  const [mode, setMode] = useState<Mode>("sales")
+export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) {
+  const [mode, setMode] = useState<Mode>(assign ? "assign" : focus ? "kansen" : "sales")
+  const shading: Shading = mode === "sales" ? "sales" : "kansen"
   const [periodDays, setPeriodDays] = useState<number>(90)
   const [woz, setWoz] = useState<WozBand>("low")
   /** The map's zoom, and once zoomed in its box and whether PC5 areas or streets fill it. */
@@ -106,20 +136,13 @@ export function SalesMapPage({ onBack }: Props) {
 
   const sales = useQuery({
     queryKey: ["sales-map", from, until],
-    queryFn: async () => {
-      const response = await getSalesMap({ from, to: until })
-      if (!("map" in response)) throw new Error("Onverwacht antwoord")
-      return response
-    },
+    queryFn: () => fetchSalesMap(from, until),
     placeholderData: keepPreviousData,
     enabled: mode === "sales",
   })
   const salesDetail = useQuery({
     queryKey: ["sales-map-detail", from, until, bbox, level],
-    queryFn: async () => {
-      const response = await getSalesMap({ from, to: until, bbox: bbox!, level })
-      return "detail" in response ? response.detail : undefined
-    },
+    queryFn: () => fetchSalesDetail(from, until, bbox!, level),
     enabled: mode === "sales" && bbox !== null,
     gcTime: VIEW_CACHE_MS,
   })
@@ -131,7 +154,7 @@ export function SalesMapPage({ onBack }: Props) {
       return response
     },
     placeholderData: keepPreviousData,
-    enabled: mode === "kansen",
+    enabled: shading === "kansen",
     // Customers are counted once a night; no need to ask again while the page is open.
     staleTime: 15 * 60_000,
   })
@@ -141,8 +164,36 @@ export function SalesMapPage({ onBack }: Props) {
       const response = await getSalesOpportunities({ action: level, woz, bbox: bbox! })
       return response.action === level ? response.view : undefined
     },
-    enabled: mode === "kansen" && bbox !== null,
+    enabled: shading === "kansen" && bbox !== null,
     staleTime: 15 * 60_000,
+    gcTime: VIEW_CACHE_MS,
+  })
+
+  // Giving out areas: what was given out in the chosen days, and a year of sales for "laatste verkoop".
+  const assigning = mode === "assign"
+  const [periods] = useState(() => periodsFor(until, assign?.days))
+  const [period, setPeriod] = useState(
+    () =>
+      periods.find((p) => p.startsOn === assign?.days?.startsOn && p.endsOn === assign.days.endsOn) ??
+      periods.find((p) => p.key === "week")!,
+  )
+  const [chosen, setChosen] = useState<string[]>(assign?.wervernr ? [assign.wervernr] : [])
+  const [picked, setPicked] = useState<PickedArea[]>([])
+  const [note, setNote] = useState("")
+  const [naming, setNaming] = useState(false)
+  const recruiters = useRecruiters(assigning)
+  const given = useAreaAssignments(period.startsOn, period.endsOn, assigning)
+  const create = useCreateAreaAssignment()
+  const yearFrom = addDays(until, -364)
+  const salesYear = useQuery({
+    queryKey: ["sales-map", yearFrom, until],
+    queryFn: () => fetchSalesMap(yearFrom, until),
+    enabled: assigning,
+  })
+  const salesYearDetail = useQuery({
+    queryKey: ["sales-map-detail", yearFrom, until, bbox, level],
+    queryFn: () => fetchSalesDetail(yearFrom, until, bbox!, level),
+    enabled: assigning && bbox !== null,
     gcTime: VIEW_CACHE_MS,
   })
 
@@ -192,10 +243,79 @@ export function SalesMapPage({ onBack }: Props) {
   const names = useMemo(() => new Map(salesMap?.recruiters.map((r) => [r.number, r.name]) ?? []), [salesMap])
   const shades: Map<string, Shade> = mode === "sales" ? salesAreas : kansenAreas
 
+  const yearAreas = useMemo(
+    () => new Map(salesYear.data?.map.areas.map((a) => [a.postcode, a]) ?? []),
+    [salesYear.data],
+  )
+  const yearDetail = salesYearDetail.data
+  const yearStreets = useMemo(() => new Map(yearDetail?.areas.map((a) => [a.postcode, a]) ?? []), [yearDetail])
+  const taken = useMemo(() => given.data?.flatMap((a) => a.postcodes) ?? [], [given.data])
+  const busy = useMemo(() => new Set(given.data?.flatMap((a) => a.wervernrs)), [given.data])
+  const overlapWith = [
+    ...new Set(
+      (given.data ?? [])
+        .filter((a) => a.postcodes.some((code) => picked.some((p) => overlaps(code, p.code))))
+        .flatMap((a) => a.members.map((m) => firstName(m.name))),
+    ),
+  ]
+  const overlay = useMemo<Overlay>(
+    () => (assigning ? { picked: picked.map((p) => p.code), taken } : { picked: focus?.postcodes ?? [], taken: [] }),
+    [assigning, picked, taken, focus],
+  )
+
+  async function assignPicked() {
+    const bounds = unionBounds(picked.map((p) => p.bounds))
+    setNaming(true)
+    const label = bounds ? await lookupPlace(...centreOf(bounds)) : ""
+    setNaming(false)
+    const { households, open } = summarize(picked)
+    const names = (recruiters.data ?? []).filter((r) => chosen.includes(r.wervernr)).map((r) => firstName(r.wervernaam))
+    create.mutate(
+      {
+        postcodes: picked.map((p) => p.code),
+        wervernrs: chosen,
+        startsOn: period.startsOn,
+        endsOn: period.endsOn,
+        label,
+        note: note.trim(),
+        bounds,
+        households,
+        open,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Toegewezen aan ${names.join(" en ")}`)
+          setPicked([])
+          setNote("")
+        },
+        onError: (error) => toast.error(getErrorMessage(error)),
+      },
+    )
+  }
+
   // Read when the map is tapped; kept current without recreating the map.
   const popup = useRef<PopupFor>({ area: () => document.createElement("div"), detail: () => null })
   useEffect(() => {
     popup.current = {
+      // Giving out areas, a tap picks the area with what is known of it now, so its numbers survive panning away.
+      pick: assigning
+        ? (postcode, at, bounds) => {
+            const area = (at === "pc4" ? kansenAreas.get(postcode) : current[at].get(postcode)) as
+              OpportunityArea | OpportunityDetail | undefined
+            const kansenKnown = at === "pc4" ? opportunities !== undefined : current[at].size > 0
+            const salesKnown = at === "pc4" ? salesYear.data !== undefined : yearDetail?.level === at
+            const sale = at === "pc4" ? yearAreas.get(postcode) : yearStreets.get(postcode)
+            setPicked((before) =>
+              pickArea(before, {
+                code: postcode,
+                bounds,
+                households: area?.households,
+                open: area ? area.open : kansenKnown ? 0 : undefined,
+                lastSold: sale ? sale.lastSoldOn : salesKnown ? null : undefined,
+              }),
+            )
+          }
+        : undefined,
       area:
         mode === "sales"
           ? (postcode) => salesPopup(postcode, salesAreas.get(postcode), names)
@@ -213,7 +333,20 @@ export function SalesMapPage({ onBack }: Props) {
           : kansenStreetPopup(area as OpportunityDetail)
       },
     }
-  }, [mode, salesAreas, kansenAreas, names, woz, current])
+  }, [
+    mode,
+    salesAreas,
+    kansenAreas,
+    names,
+    woz,
+    current,
+    assigning,
+    opportunities,
+    salesYear.data,
+    yearAreas,
+    yearDetail,
+    yearStreets,
+  ])
 
   return (
     <div className="flex h-svh flex-col bg-muted">
@@ -249,10 +382,14 @@ export function SalesMapPage({ onBack }: Props) {
           options={[
             { value: "sales", label: "Verkopen" },
             { value: "kansen", label: "Kansen" },
+            ...(isAdmin && SHOW_AREAS ? [{ value: "assign" as const, label: "Toewijzen" }] : []),
           ]}
           value={mode}
           onChange={setMode}
         />
+        {focus && !assigning && (
+          <Badge className="border-orange-600 bg-orange-50 text-orange-800">{areaTitle(focus)}</Badge>
+        )}
         {mode === "sales" ? (
           <>
             <Choice
@@ -280,12 +417,14 @@ export function SalesMapPage({ onBack }: Props) {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <SalesMap
-          mode={mode}
+          mode={shading}
           shades={shades}
           seen={current}
           shown={shown}
           faint={faint}
           popup={popup}
+          overlay={overlay}
+          fitTo={focus?.bounds ?? null}
           onView={setView}
           onDrawing={setDrawing}
         />
@@ -330,17 +469,47 @@ export function SalesMapPage({ onBack }: Props) {
           in voor de straten.
         </p>
       )}
+      {assigning && (
+        <AssignPanel
+          picked={picked}
+          recruiters={recruiters.data}
+          chosen={chosen}
+          onChoose={setChosen}
+          periods={periods}
+          period={period}
+          onPeriod={setPeriod}
+          busy={busy}
+          overlapWith={overlapWith}
+          note={note}
+          onNote={setNote}
+          assigning={naming || create.isPending}
+          onAssign={() => void assignPicked()}
+        />
+      )}
     </div>
   )
+}
+
+async function fetchSalesMap(from: string, to: string) {
+  const response = await getSalesMap({ from, to })
+  if (!("map" in response)) throw new Error("Onverwacht antwoord")
+  return response
+}
+
+async function fetchSalesDetail(from: string, to: string, bbox: string, level: "pc5" | "pc6") {
+  const response = await getSalesMap({ from, to, bbox, level })
+  return "detail" in response ? response.detail : undefined
 }
 
 type PopupFor = {
   area: (postcode: string) => HTMLElement
   detail: (postcode: string, level: "pc5" | "pc6") => HTMLElement | null
+  /** Set while giving out areas: a tap picks or drops the area under it instead of explaining it. */
+  pick?: (postcode: string, level: Level, bounds: Bounds) => void
 }
 
 type MapProps = {
-  mode: Mode
+  mode: Shading
   /** PC4 shades. */
   shades: Map<string, Shade>
   /** PC5 and street shades seen while zoomed in. */
@@ -350,6 +519,10 @@ type MapProps = {
   /** Whether PC4 is only a tint under it. */
   faint: boolean
   popup: { current: PopupFor }
+  /** Areas picked or given out, drawn over the shades. */
+  overlay: Overlay
+  /** Where the map opens instead of the whole country. */
+  fitTo: Bounds | null
   /** Called a moment after the map stops moving. */
   onView: (view: MapView) => void
   /** Called as soon as zooming crosses into another level, and with null once its tiles are all drawn. */
@@ -368,7 +541,7 @@ const LEVELS: Level[] = ["pc4", "pc5", "pc6"]
  * The MapLibre map. All three levels are vector tiles from TILES_URL, coloured by feature state, so new numbers
  * never reload an outline. MapLibre keeps only the tiles near the view in memory.
  */
-function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }: MapProps) {
+function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onView, onDrawing }: MapProps) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const viewChanged = useRef(onView)
@@ -444,9 +617,14 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }
               },
             },
           ]),
+          ...LEVELS.flatMap((level) => overlayLayers(level, MIN_ZOOM[level], MAX_ZOOM[level])),
           { id: "labels", type: "raster", source: "labels", minzoom: PC5_ZOOM },
         ],
       },
+    })
+    // The hatching of areas given out is drawn here rather than shipped as an image.
+    map.setMissingStyleImageResolver((id) => {
+      if (id === "hatch" && !map.hasImage("hatch")) addHatch(map)
     })
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
     // A trackpad pinch arrives as scroll events at this rate (MapLibre's default is 1/100): twice as fast, so a few
@@ -491,6 +669,13 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }
     const info = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
     map.on("click", (event) => {
       const level = shownRef.current
+      const pick = popup.current.pick
+      if (pick) {
+        info.remove()
+        const [feature] = map.queryRenderedFeatures(event.point, { layers: [`${level}-fill`] })
+        if (feature?.id !== undefined) pick(String(feature.id), level, geometryBounds(feature.geometry))
+        return
+      }
       if (level !== "pc4") {
         const [detail] = map.queryRenderedFeatures(event.point, { layers: [`${level}-fill`] })
         const content = detail?.id !== undefined ? popup.current.detail(String(detail.id), level) : null
@@ -542,6 +727,17 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }
     }
   }, [shades, loaded])
 
+  useEffect(() => {
+    const map = mapRef.current
+    if (map && loaded) applyOverlay(map, LEVELS, overlay)
+  }, [overlay, loaded])
+
+  // Opening on an area: once, when the map is ready.
+  useEffect(() => {
+    const map = mapRef.current
+    if (map && loaded && fitTo) map.fitBounds(fitTo, { padding: 48, maxZoom: 15, duration: 0 })
+  }, [fitTo, loaded])
+
   // The PC5 areas and streets seen while zoomed in: only the new ones are set, and all are cleared with the filter.
   const applied = useRef<Seen>(nothingSeen(""))
   useEffect(() => {
@@ -574,6 +770,9 @@ const levelAt = (zoom: number): Level => (zoom >= STREET_ZOOM ? "pc6" : zoom >= 
 /** Where each level's tiles start; a level is drawn from there until the next one takes over. */
 const MIN_ZOOM: Record<Level, number> = { pc4: 0, pc5: PC5_ZOOM, pc6: STREET_ZOOM }
 
+/** Where the next level takes over. */
+const MAX_ZOOM: Record<Level, number> = { pc4: PC5_ZOOM, pc5: STREET_ZOOM, pc6: 24 }
+
 const SHADED: ExpressionSpecification = ["boolean", ["feature-state", "shaded"], false]
 
 type FillPaint = { "fill-color": ExpressionSpecification; "fill-opacity": ExpressionSpecification }
@@ -583,7 +782,7 @@ type FillPaint = { "fill-color": ExpressionSpecification; "fill-opacity": Expres
  * shade is see-through (STREET_OPACITY), so streets, buildings and names show under even the darkest one; the colour
  * keeps the ranking.
  */
-function statePaint(mode: Mode, faint: boolean): FillPaint {
+function statePaint(mode: Shading, faint: boolean): FillPaint {
   const level: ExpressionSpecification = ["feature-state", "level"]
   const opacity = faint ? (["*", FAINT, fillOpacity(mode, level)] as ExpressionSpecification) : fillOpacity(mode, level)
   const shaded = (value: ExpressionSpecification): ExpressionSpecification => ["case", SHADED, value, 0]
