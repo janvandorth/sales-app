@@ -10,8 +10,8 @@ import type { AreaAssignment, AreaMember, AssignStart } from "@/features/areas/a
 
 export type View = "form" | "dashboard" | "map" | "sales" | "admin" | "planning" | "areas" | "walk"
 
-/** How the map opens: plain, giving out an area, or on one area. `key` makes every opening a fresh map. */
-export type MapStart = { assign?: AssignStart; focus?: AreaAssignment; key: number }
+/** How the map opens: plain, giving out an area, or on one area. */
+export type MapStart = { assign?: AssignStart; focus?: AreaAssignment }
 
 export type Page = {
   view: View
@@ -57,7 +57,7 @@ export function pageFromUrl(pathname: string, search: string): Page {
   const werver = new URLSearchParams(search).get("werver")
   const viewedAs = werver ? { wervernr: werver, name: werver } : undefined
   if (view === "walk") return { view: "areas", viewedAs }
-  if (view === "map") return { view: "map", map: { key: 0 } }
+  if (view === "map") return { view: "map", map: {} }
   return { view, viewedAs }
 }
 
@@ -106,7 +106,8 @@ export function useNavigation(initial: () => Page) {
     [entry.depth],
   )
 
-  return { page: entry as Page, go, back }
+  // The depth tells entries apart: a page opened again is a new entry, so it can start fresh.
+  return { page: entry as Page, depth: entry.depth, go, back }
 }
 
 /** Dev only: keeps `?demo…` on every address, so a reload stays in the demo. */
