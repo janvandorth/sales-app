@@ -47,9 +47,9 @@ const FORM: Page = { view: "form" }
 
 export default function App() {
   const { session, loading, needsPassword, isInvite, passwordSet } = useSession()
-  const { page, go, back } = useNavigation(() =>
+  const { page, depth, go, back } = useNavigation(() =>
     import.meta.env.DEV && DEMO_MODE
-      ? { view: demoView(), map: { key: 0 } }
+      ? { view: demoView(), map: {} }
       : pageFromUrl(window.location.pathname, window.location.search),
   )
   const { view, viewedAs, walking } = page
@@ -68,7 +68,7 @@ export default function App() {
     networkMode: "always",
   })
 
-  const openMap = (map: Omit<MapStart, "key">) => go({ view: "map", map: { ...map, key: Date.now() } })
+  const openMap = (map: MapStart) => go({ view: "map", map })
 
   const menu: AppMenuValue = {
     profile:
@@ -96,11 +96,11 @@ export default function App() {
   /** The map and the area pages, which lead to each other; null for any other view. */
   function areaViews(profile: Profile | undefined) {
     if (view === "map") {
-      const map = page.map ?? { key: 0 }
+      const map = page.map ?? {}
       return (
         <Suspense fallback={pageSpinner}>
           <SalesMapPage
-            key={map.key}
+            key={depth}
             isAdmin={profile?.isAdmin}
             assign={map.assign}
             focus={map.focus}
@@ -141,6 +141,7 @@ export default function App() {
             setSoldAt(door)
             go(FORM)
           }}
+          onShowMap={() => openMap({ focus: walking })}
         />
       )
     }

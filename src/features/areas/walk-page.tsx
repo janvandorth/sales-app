@@ -6,7 +6,7 @@ import {
   ChevronsRightIcon,
   FileTextIcon,
   LocateFixedIcon,
-  MapPinIcon,
+  MapIcon,
   Undo2Icon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -44,6 +44,8 @@ type Props = {
   onBack: () => void
   /** "Verkocht": opens the sales form with this address filled in. */
   onSold: (door: Door) => void
+  /** Opens the map on the area. */
+  onShowMap: () => void
 }
 
 type Side = "even" | "odd"
@@ -65,7 +67,7 @@ const OUTCOME_STYLES: Record<Outcome | "open", string> = {
  * Door by door through an area: the street comes from where the phone is (or is picked), its house numbers from
  * the BAG, one side at a time in walking order. One tap per door logs how it went and moves on to the next.
  */
-export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
+export function WalkPage({ area, wervernr, onBack, onSold, onShowMap }: Props) {
   const position = usePosition()
   const places = useQuery({
     queryKey: ["area-postcodes", area.postcodes],
@@ -133,7 +135,6 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
   const moveTo = (i: number) => setPositions((p) => ({ ...p, [at]: Math.max(0, Math.min(list.length - 1, i)) }))
 
   const day = today()
-  const mine = all.filter((v) => v.wervernr === wervernr && localDate(v.visitedAt) === day && v.outcome !== "skip")
 
   function mark(outcome: Outcome) {
     if (!door || !wervernr) return
@@ -186,45 +187,38 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
       />
 
       <div className={`mx-auto flex w-full flex-1 flex-col gap-3 px-4 py-3 ${PAGE_WIDTH}`}>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <MapPinIcon className={cn("size-4", position ? "text-teal-700" : "")} />
-          {door ? `${door.postcode.slice(0, 4)} ${door.postcode.slice(4)}` : (street?.plaats ?? "")}
-          {outside && <span className="font-medium text-orange-700">· je bent buiten je gebied</span>}
-          <span className="ml-auto whitespace-nowrap">
-            {mine.length} {mine.length === 1 ? "deur" : "deuren"} · {mine.filter((v) => v.outcome === "sold").length}{" "}
-            verkocht
-          </span>
-        </div>
+        {outside && <p className="text-sm font-medium text-orange-700">Je bent buiten je gebied</p>}
 
-        {streets.length > 1 && (
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4" role="group" aria-label="Straat">
-            {position && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 shrink-0 rounded-full"
-                onClick={() => {
-                  setPicked(null)
-                  setSnapped(null)
-                }}
-              >
-                <LocateFixedIcon /> Waar ik ben
-              </Button>
-            )}
-            {nearby.slice(0, 15).map((s) => (
-              <Button
-                key={s.key}
-                size="sm"
-                variant={s.key === street?.key ? "default" : "outline"}
-                className="h-9 shrink-0 rounded-full"
-                aria-pressed={s.key === street?.key}
-                onClick={() => setPicked(s.key)}
-              >
-                {s.name}
-              </Button>
-            ))}
-          </div>
-        )}
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4" role="group" aria-label="Straat">
+          <Button variant="outline" size="sm" className="h-9 shrink-0 rounded-full" onClick={onShowMap}>
+            <MapIcon /> Kaart
+          </Button>
+          {position && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 rounded-full"
+              onClick={() => {
+                setPicked(null)
+                setSnapped(null)
+              }}
+            >
+              <LocateFixedIcon /> Waar ik ben
+            </Button>
+          )}
+          {nearby.slice(0, 15).map((s) => (
+            <Button
+              key={s.key}
+              size="sm"
+              variant={s.key === street?.key ? "default" : "outline"}
+              className="h-9 shrink-0 rounded-full"
+              aria-pressed={s.key === street?.key}
+              onClick={() => setPicked(s.key)}
+            >
+              {s.name}
+            </Button>
+          ))}
+        </div>
 
         {error && (
           <Alert variant="destructive">
