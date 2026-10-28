@@ -9,6 +9,7 @@ import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { getSalesMap, getSalesOpportunities } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
 import type { MapArea, SalesStreet, StreetsView } from "@shared/sales-map-view"
@@ -102,6 +103,8 @@ export function SalesMapPage({ onBack }: Props) {
   const opportunities = kansen.data?.view
   const streets: StreetsView<SalesStreet | OpportunityStreet> | undefined =
     bbox === null ? undefined : mode === "sales" ? salesStreets.data : kansenStreets.data
+  // The first look at a spot waits for PDOK's outlines, a few seconds: say so, or the map seems stuck.
+  const streetsLoading = bbox !== null && (mode === "sales" ? salesStreets.isFetching : kansenStreets.isFetching)
 
   const salesAreas = useMemo(() => new Map(salesMap?.areas.map((a) => [a.postcode, a]) ?? []), [salesMap])
   const kansenAreas = useMemo(() => new Map(opportunities?.areas.map((a) => [a.postcode, a]) ?? []), [opportunities])
@@ -192,7 +195,18 @@ export function SalesMapPage({ onBack }: Props) {
         </Alert>
       )}
 
-      <SalesMap mode={mode} shades={shades} streets={streets} popup={popup} onStreetView={setBbox} />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <SalesMap mode={mode} shades={shades} streets={streets} popup={popup} onStreetView={setBbox} />
+        {streetsLoading && (
+          <div
+            role="status"
+            className="absolute top-3 left-3 z-10 flex items-center gap-2.5 rounded-full bg-background/95 px-4 py-2.5 text-base font-medium shadow-lg"
+          >
+            <Spinner className="size-5" />
+            Straten laden…
+          </div>
+        )}
+      </div>
 
       {mode === "sales" && salesMap?.detailed && (
         <p className="border-t bg-background px-4 py-1.5 text-xs text-muted-foreground">
