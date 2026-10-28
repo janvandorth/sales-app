@@ -32,6 +32,9 @@ export const codeAt = (postcode: string, level: PostcodeLevel) => postcode.slice
 
 export const PICKED_COLOR = "#ea580c"
 
+/** A light red over the picked areas, so the selection reads as one block; the kansen shade still shows through. */
+const PICKED_FILL = "#ef4444"
+
 const POSTCODE: ExpressionSpecification = ["get", "postcode"]
 
 /** Features covered by any of `codes`: their postcode starts with one. */
@@ -64,6 +67,12 @@ export function overlayLayers(level: string, minzoom: number, maxzoom: number): 
     },
     // The area a tap would pick, under the mouse.
     { ...base, id: `${level}-hover`, type: "fill", paint: { "fill-color": PICKED_COLOR, "fill-opacity": 0.3 } },
+    {
+      ...base,
+      id: `${level}-picked-fill`,
+      type: "fill",
+      paint: { "fill-color": PICKED_FILL, "fill-opacity": 0.22 },
+    },
     { ...base, id: `${level}-picked`, type: "line", paint: { "line-color": PICKED_COLOR, "line-width": 3.5 } },
   ]
 }
@@ -78,7 +87,9 @@ export function applyOverlay(map: MapLibreMap, levels: readonly PostcodeLevel[],
     const length = Number(level.slice(2)) // "pc5" → 5
     map.setFilter(`${level}-taken`, coveredBy(overlay.taken))
     map.setFilter(`${level}-part`, oneOf(part))
-    map.setFilter(`${level}-picked`, oneOf(overlay.picked.filter((c) => c.length === length)))
+    const picked = oneOf(overlay.picked.filter((c) => c.length === length))
+    map.setFilter(`${level}-picked-fill`, picked)
+    map.setFilter(`${level}-picked`, picked)
   }
 }
 
