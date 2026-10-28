@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import * as maplibregl from "maplibre-gl"
 import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl"
-import { ArrowLeftIcon, RefreshCwIcon, ZoomInIcon } from "lucide-react"
+import { ArrowLeftIcon, ZoomInIcon } from "lucide-react"
 import { toast } from "sonner"
+import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -361,28 +362,12 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
     <div className="flex h-svh flex-col bg-muted">
       <PageHeader
         start={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Terug naar formulier"
-            onClick={onBack}
-          >
+          <Button variant="ghost" size="icon" className={HEADER_BUTTON_CLASS} aria-label="Terug" onClick={onBack}>
             <ArrowLeftIcon />
           </Button>
         }
         title="Verkoopkaart"
-        end={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Vernieuwen"
-            onClick={() => void query.refetch()}
-          >
-            <RefreshCwIcon className={query.isFetching ? "animate-spin" : undefined} />
-          </Button>
-        }
+        end={<AppMenu />}
       />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b bg-background px-4 py-2">

@@ -6,11 +6,9 @@ import type { Session } from "@supabase/supabase-js"
 import type { FormInput, FormValues } from "@shared/form-schema"
 import { Spinner } from "@/components/ui/spinner"
 import { doorLabel, type Door } from "@/features/areas/doors"
-import { ChangePasswordDialog } from "@/features/auth/change-password-dialog"
 import { useOnline } from "@/hooks/use-online"
 import { useProfile } from "@/hooks/use-profile"
 import { getErrorMessage } from "@/lib/errors"
-import { supabase } from "@/lib/supabase"
 import { OutboxDialog } from "../outbox/outbox-dialog"
 import type { OutboxItem } from "../outbox/outbox-store"
 import { useOutbox } from "../outbox/use-outbox"
@@ -26,20 +24,18 @@ import { useScanFill } from "./use-scan-fill"
 
 type Props = {
   session: Session
-  onOpenDashboard: () => void
-  onOpenMap: () => void
-  /** The planning for an admin, Mijn gebieden for a werver. */
-  onOpenAreas: () => void
+  /** Whether the outbox dialog is open; the menu on any page opens it. */
+  outboxOpen: boolean
+  onOutboxOpenChange: (open: boolean) => void
+  onOpenSales: () => void
   /** A door marked "Verkocht" while walking: its address goes into the form. */
   soldAt?: Door | null
   onSoldAtFilled?: () => void
-  onOpenSales: () => void
-  onOpenAdmin: () => void
 }
 
 /** Main page after login: header, the sales form, the outbox dialog and the scan overlay. */
 export function FormPage(props: Props) {
-  const { session, onOpenDashboard, onOpenMap, onOpenAreas, onOpenSales, onOpenAdmin, soldAt, onSoldAtFilled } = props
+  const { session, outboxOpen, onOutboxOpenChange: setOutboxOpen, onOpenSales, soldAt, onSoldAtFilled } = props
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
@@ -53,8 +49,6 @@ export function FormPage(props: Props) {
   useSoldAt(form, ready, soldAt, onSoldAtFilled)
   const scanFill = useScanFill(form, userId)
   const [submitting, setSubmitting] = useState(false)
-  const [outboxOpen, setOutboxOpen] = useState(false)
-  const [changingPassword, setChangingPassword] = useState(false)
   const photoInput = useRef<HTMLInputElement>(null)
   // A new rowId means a new form; used as key so the form's local state (e.g. manual address) resets too.
   const rowId = useWatch({ control: form.control, name: "rowId" })
@@ -100,30 +94,12 @@ export function FormPage(props: Props) {
     if (photo) void scanFill.scan(photo)
   }
 
-  async function handleSignOut() {
-    await clearDraft(userId)
-    // Only this device: a global sign-out would also end the recruiter's sessions on other devices.
-    await supabase.auth.signOut({ scope: "local" })
-  }
-
   return (
     <div className="min-h-svh bg-muted">
       <FormHeader
-        profile={profile}
-        email={session.user.email ?? ""}
         online={online}
         scanDisabled={!online || scanFill.phase !== null}
         onScan={() => photoInput.current?.click()}
-        outbox={outbox.items}
-        syncing={outbox.syncing}
-        onOpenOutbox={() => setOutboxOpen(true)}
-        onOpenDashboard={onOpenDashboard}
-        onOpenMap={onOpenMap}
-        onOpenAreas={onOpenAreas}
-        onOpenSales={onOpenSales}
-        onOpenAdmin={onOpenAdmin}
-        onChangePassword={() => setChangingPassword(true)}
-        onSignOut={handleSignOut}
       />
       <input
         ref={photoInput}
@@ -150,9 +126,6 @@ export function FormPage(props: Props) {
         </div>
       )}
 
-      {changingPassword && (
-        <ChangePasswordDialog email={session.user.email ?? ""} onClose={() => setChangingPassword(false)} />
-      )}
       <OutboxDialog
         open={outboxOpen}
         onOpenChange={setOutboxOpen}

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Toaster } from "@/components/ui/sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { AdminPage } from "@/features/admin/admin-page"
@@ -6,16 +7,22 @@ import type { Door } from "@/features/areas/doors"
 import { MyAreasPage } from "@/features/areas/my-areas-page"
 import { PlanningPage } from "@/features/areas/planning-page"
 import { WalkPage } from "@/features/areas/walk-page"
+import { ChangePasswordDialog } from "@/features/auth/change-password-dialog"
 import { LoginPage } from "@/features/auth/login-page"
 import { SetPasswordPage } from "@/features/auth/set-password-page"
 import { useSession } from "@/features/auth/use-session"
 import { DashboardPage } from "@/features/dashboard/dashboard-page"
+import { loadOutbox } from "@/features/outbox/outbox-store"
+import { clearDraft } from "@/features/sales-form/draft-store"
 import { FormPage } from "@/features/sales-form/form-page"
 import { SalesListPage } from "@/features/sales-list/sales-list-page"
+import { useOnline } from "@/hooks/use-online"
 import { useProfile, type Profile } from "@/hooks/use-profile"
 import { DEMO_MODE } from "@/lib/api"
+import { AppMenuContext, type AppMenuValue } from "@/lib/app-menu"
 import { IS_TEST_DEPLOYMENT, WALK_AS_WERVER } from "@/lib/deployment"
 import { pageFromUrl, useNavigation, type MapStart, type Page, type View } from "@/lib/navigation"
+import { supabase } from "@/lib/supabase"
 
 // Loaded on first use: MapLibre is large and the sales form should not wait for it.
 const SalesMapPage = lazy(() => import("@/features/sales-map/map-page").then((m) => ({ default: m.SalesMapPage })))
@@ -48,9 +55,43 @@ export default function App() {
   const { view, viewedAs, walking } = page
   /** The door marked "Verkocht": the sales form opens with its address filled in. */
   const [soldAt, setSoldAt] = useState<Door | null>(null)
-  const profile = useProfile(session?.user.id)
+  const userId = session?.user.id
+  const profile = useProfile(userId)
+  const online = useOnline()
+  const [outboxOpen, setOutboxOpen] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+  // The same query the form's outbox keeps current; IndexedDB is local, so it also runs offline.
+  const { data: queued = [] } = useQuery({
+    queryKey: ["outbox", userId],
+    queryFn: () => loadOutbox(userId!),
+    enabled: userId !== undefined,
+    networkMode: "always",
+  })
 
   const openMap = (map: Omit<MapStart, "key">) => go({ view: "map", map: { ...map, key: Date.now() } })
+
+  const menu: AppMenuValue = {
+    profile:
+      import.meta.env.DEV && DEMO_MODE
+        ? { wervernaam: "Jan van Dorth", wervernr: "0212BB", isAdmin: DEMO_MODE === "admin" }
+        : profile,
+    email: session?.user.email ?? "",
+    current: view,
+    online,
+    queued: queued.length,
+    refused: queued.some((item) => item.rejectedReason),
+    open: (target) => (target === "map" ? openMap({}) : go({ view: target })),
+    openOutbox: () => {
+      if (view !== "form") go(FORM)
+      setOutboxOpen(true)
+    },
+    changePassword: () => setChangingPassword(true),
+    signOut: async () => {
+      if (userId) await clearDraft(userId)
+      // Only this device: a global sign-out would also end the recruiter's sessions on other devices.
+      await supabase.auth.signOut({ scope: "local" })
+    },
+  }
 
   /** The map and the area pages, which lead to each other; null for any other view. */
   function areaViews(profile: Profile | undefined) {
@@ -130,13 +171,11 @@ export default function App() {
       <FormPage
         key={session.user.id}
         session={session}
-        onOpenDashboard={() => go({ view: "dashboard" })}
-        onOpenMap={() => openMap({})}
-        onOpenAreas={() => go({ view: profile?.isAdmin ? "planning" : "areas" })}
+        outboxOpen={outboxOpen}
+        onOutboxOpenChange={setOutboxOpen}
+        onOpenSales={() => go({ view: "sales" })}
         soldAt={soldAt}
         onSoldAtFilled={() => setSoldAt(null)}
-        onOpenSales={() => go({ view: "sales" })}
-        onOpenAdmin={() => go({ view: "admin" })}
       />
     )
   }
@@ -148,7 +187,10 @@ export default function App() {
           TESTOMGEVING · verkopen gaan naar de testomgeving van ZMAdmin
         </div>
       )}
-      {content()}
+      <AppMenuContext value={menu}>{content()}</AppMenuContext>
+      {changingPassword && session && (
+        <ChangePasswordDialog email={session.user.email ?? ""} onClose={() => setChangingPassword(false)} />
+      )}
       <Toaster position="top-center" richColors />
     </>
   )

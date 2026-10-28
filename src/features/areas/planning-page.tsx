@@ -9,6 +9,7 @@ import {
   Trash2Icon,
 } from "lucide-react"
 import { toast } from "sonner"
+import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
@@ -85,22 +86,12 @@ export function PlanningPage({ onBack, onAssign, onShow, onViewAs }: Props) {
           </Button>
         }
         title="Planning"
-        end={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Vernieuwen"
-            onClick={() => void areas.refetch()}
-          >
-            <RefreshCwIcon className={areas.isFetching ? "animate-spin" : undefined} />
-          </Button>
-        }
+        end={<AppMenu />}
       />
 
       <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 border-b bg-background/95 backdrop-blur">
         <div className={`mx-auto space-y-2 px-4 py-2 ${PAGE_WIDTH}`}>
-          <div className="flex items-center justify-center gap-2">
+          <div className="relative flex items-center justify-center gap-2">
             <Button variant="ghost" size="icon" aria-label="Vorige week" onClick={() => setMonday(addDays(monday, -7))}>
               <ChevronLeftIcon />
             </Button>
@@ -112,6 +103,15 @@ export function PlanningPage({ onBack, onAssign, onShow, onViewAs }: Props) {
               onClick={() => setMonday(addDays(monday, 7))}
             >
               <ChevronRightIcon />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 text-muted-foreground"
+              aria-label="Vernieuwen"
+              onClick={() => void areas.refetch()}
+            >
+              <RefreshCwIcon className={areas.isFetching ? "animate-spin" : undefined} />
             </Button>
           </div>
           <div className="grid grid-cols-6 gap-1" role="group" aria-label="Dag">

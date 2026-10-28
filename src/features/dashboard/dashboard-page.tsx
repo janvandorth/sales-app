@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
-import { ArrowLeftIcon, ChevronDownIcon, ClockIcon, RefreshCwIcon } from "lucide-react"
+import { ArrowLeftIcon, ChevronDownIcon, ClockIcon } from "lucide-react"
+import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -90,13 +91,7 @@ export function DashboardPage({ profile, onBack }: Props) {
     <div className="min-h-svh bg-muted">
       <PageHeader
         start={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Terug naar formulier"
-            onClick={onBack}
-          >
+          <Button variant="ghost" size="icon" className={HEADER_BUTTON_CLASS} aria-label="Terug" onClick={onBack}>
             <ArrowLeftIcon />
           </Button>
         }
@@ -125,17 +120,7 @@ export function DashboardPage({ profile, onBack }: Props) {
             "Mijn resultaten"
           )
         }
-        end={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Vernieuwen"
-            onClick={() => void kpi.refetch()}
-          >
-            <RefreshCwIcon className={kpi.isFetching ? "animate-spin" : undefined} />
-          </Button>
-        }
+        end={<AppMenu />}
       />
 
       {selected && (

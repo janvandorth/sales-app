@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, RefreshCwIcon } from "lucide-react"
+import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -44,28 +45,12 @@ export function SalesListPage({ profile, userId, onBack }: Props) {
     <div className="min-h-svh bg-muted">
       <PageHeader
         start={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Terug naar formulier"
-            onClick={onBack}
-          >
+          <Button variant="ghost" size="icon" className={HEADER_BUTTON_CLASS} aria-label="Terug" onClick={onBack}>
             <ArrowLeftIcon />
           </Button>
         }
         title={isAdmin ? "Verkopen team" : "Mijn verkopen"}
-        end={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Vernieuwen"
-            onClick={() => void sales.refetch()}
-          >
-            <RefreshCwIcon className={sales.isFetching ? "animate-spin" : undefined} />
-          </Button>
-        }
+        end={<AppMenu />}
       />
 
       <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 border-b bg-background/95 backdrop-blur">
@@ -103,6 +88,16 @@ export function SalesListPage({ profile, userId, onBack }: Props) {
             onClick={() => setDate(addDays(date, 1))}
           >
             <ChevronRightIcon className="size-5" />
+          </Button>
+          {/* By hand, for ZMAdmin's answer on a sale just sent; the list also refreshes when the app comes back. */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10 shrink-0 border-l text-muted-foreground"
+            aria-label="Vernieuwen"
+            onClick={() => void sales.refetch()}
+          >
+            <RefreshCwIcon className={cn("size-5", sales.isFetching && "animate-spin")} />
           </Button>
         </div>
       </div>
