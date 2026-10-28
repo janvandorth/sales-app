@@ -11,3 +11,9 @@ export const SHOW_RESULTS = IS_TEST_DEPLOYMENT || import.meta.env.DEV
 
 /** Giving out areas ("Planning", "Mijn gebieden", "Toewijzen" on the map) is tried out in the same places. */
 export const SHOW_AREAS = SHOW_RESULTS
+
+/**
+ * Testing only: a manager who opens a werver's areas from the planning walks them as that werver, so their doors
+ * are logged under the werver's number. Elsewhere everyone logs under their own.
+ */
+export const WALK_AS_WERVER = IS_TEST_DEPLOYMENT || import.meta.env.DEV

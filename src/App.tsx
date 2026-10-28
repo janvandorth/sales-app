@@ -15,7 +15,7 @@ import { FormPage } from "@/features/sales-form/form-page"
 import { SalesListPage } from "@/features/sales-list/sales-list-page"
 import { useProfile, type Profile } from "@/hooks/use-profile"
 import { DEMO_MODE } from "@/lib/api"
-import { IS_TEST_DEPLOYMENT } from "@/lib/deployment"
+import { IS_TEST_DEPLOYMENT, WALK_AS_WERVER } from "@/lib/deployment"
 
 // Loaded on first use: MapLibre is large and the sales form should not wait for it.
 const SalesMapPage = lazy(() => import("@/features/sales-map/map-page").then((m) => ({ default: m.SalesMapPage })))
@@ -107,8 +107,8 @@ export default function App() {
       return (
         <WalkPage
           area={walking}
-          // Doors are logged under whoever walks, also a manager on a werver's page; they count for the area.
-          wervernr={profile?.wervernr}
+          // Doors are logged under whoever walks; on the test deployment a manager on a werver's page walks as them.
+          wervernr={(WALK_AS_WERVER && viewedAs?.wervernr) || profile?.wervernr}
           onBack={() => setView("areas")}
           onSold={(door) => {
             setSoldAt(door)
