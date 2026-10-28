@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 dist
+# The sales map's tile archives (scripts/build-postcode-tiles.mjs) live in Supabase Storage, not in git.
+public/tiles
 dist-ssr
 *.local
 

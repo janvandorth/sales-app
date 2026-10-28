@@ -66,6 +66,7 @@ export function serve(handler: (req: Request) => Promise<Response>) {
       }
     }
     for (const [name, value] of Object.entries(cors)) response.headers.set(name, value)
+    // Not compressed here: Supabase's gateway already gzips every answer for callers that accept it.
     return response
   })
 }

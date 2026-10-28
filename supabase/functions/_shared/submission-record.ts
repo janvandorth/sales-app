@@ -92,6 +92,7 @@ const BETAALPERIODE_CODES: Record<string, string> = {
   "Maand Machtiging": "MM",
   "Jaar Machtiging": "JM",
   "Kwartaal Machtiging": "KM",
+  "Zakelijk Jaar Machtiging": "ZM",
   "Jaar Acceptgiro": "JA",
   "Zakelijk Acceptgiro": "ZA",
 }

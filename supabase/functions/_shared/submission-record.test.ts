@@ -24,7 +24,7 @@ const values = formSchema.parse({
   ibanTnvZelfde: true,
   ibanTnv: "",
   contractType: "Zakelijk",
-  betaalperiode: "Jaar Acceptgiro",
+  betaalperiode: "Zakelijk Jaar Machtiging",
   opmerkingen: "Graag bellen",
   scanPath: "",
   werver: null,
@@ -124,7 +124,7 @@ describe("toSheetRow", () => {
       "pj@voorbeeld.nl",
       "NL91ABNA0417164300",
       "Z",
-      "JA",
+      "ZM",
       "Graag bellen",
     ])
   })

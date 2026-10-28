@@ -8,8 +8,11 @@ import {
 import type { AdminUser } from "@shared/admin-types"
 import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import type { KpiRequest, KpiResponse } from "@shared/kpi"
-import type { ZmRecruiter } from "@shared/recruiters"
+import type { SalesMapRequest } from "@shared/sales-map"
+import type { SalesMapResponse } from "@shared/sales-map-view"
+import type { SalesOpportunitiesRequest, SalesOpportunitiesResponse } from "@shared/sales-opportunities"
 import { SCANS_BUCKET } from "@shared/storage"
+import type { Recruiter } from "@shared/submission-record"
 import { IS_TEST_DEPLOYMENT, TEST_DEPLOYMENT_HEADER } from "@/lib/deployment"
 import { ApiError, AuthError, NetworkError } from "@/lib/errors"
 import { supabase } from "@/lib/supabase"
@@ -70,9 +73,9 @@ export function submitForm(values: FormInput) {
   return invoke<{ ok: true; rowId: string; duplicate: boolean }>("submit-form", { ...values })
 }
 
-/** Admins only: ZMAdmin's active recruiters, to book a sale on someone else. */
+/** Admins only: the app's recruiters that are not admins, to book a sale on someone else. */
 export function listRecruiters() {
-  return invoke<{ recruiters: ZmRecruiter[] }>("recruiters", {}).then((result) => result.recruiters)
+  return invoke<{ recruiters: Recruiter[] }>("recruiters", {}).then((result) => result.recruiters)
 }
 
 /**
@@ -113,6 +116,54 @@ export async function getKpi(request: KpiRequest): Promise<KpiResponse> {
     return { demo: true, wervernr, stats: demoSalesStats(request.from, request.to, wervernr) }
   }
   return invoke<KpiResponse>("kpi", { ...request })
+}
+
+export async function getSalesMap(request: SalesMapRequest): Promise<SalesMapResponse> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoSalesMap } = await import("@shared/sales-map-demo")
+    const { salesMapView, salesPc5View, salesStreetsView } = await import("@shared/sales-map-view")
+    const detailed = DEMO_MODE === "admin"
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    // The demo has nothing zoomed in: there, only the outlines show.
+    if (request.bbox && request.level === "pc5") {
+      return { demo: true, detail: salesPc5View({ areaThresholds: [], areas: [] }, detailed, "", "") }
+    }
+    if (request.bbox) {
+      return { demo: true, detail: salesStreetsView({ streetThresholds: [], streets: [] }, detailed, "", "") }
+    }
+    const map = demoSalesMap(request.from, request.to)
+    return { demo: true, map: salesMapView(map, detailed, request.from, request.to) }
+  }
+  return invoke<SalesMapResponse>("sales-map", { ...request })
+}
+
+export async function getSalesOpportunities(request: SalesOpportunitiesRequest): Promise<SalesOpportunitiesResponse> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const demo = await import("@shared/sales-opportunities-demo")
+    const shared = await import("@shared/sales-opportunities")
+    const detailed = DEMO_MODE === "admin"
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    if (request.action === "areas") {
+      return {
+        demo: true,
+        action: "areas",
+        view: shared.opportunitiesView(demo.demoOpportunityAreas(request.woz), detailed),
+      }
+    }
+    if (request.action === "streets") {
+      const streets = demo.demoOpportunityStreets(request.pc4, request.woz)
+      return { demo: true, action: "streets", view: shared.opportunityStreetsView(streets, detailed) }
+    }
+    if (request.action === "pc5") {
+      return { demo: true, action: "pc5", view: shared.opportunityPc5View({ areaThresholds: [], areas: [] }, detailed) }
+    }
+    return {
+      demo: true,
+      action: "pc6",
+      view: shared.opportunityPc6View({ streetThresholds: [], streets: [] }, detailed),
+    }
+  }
+  return invoke<SalesOpportunitiesResponse>("sales-opportunities", { ...request })
 }
 
 // --- Sales per day ------------------------------------------------------------------------------
@@ -198,8 +249,7 @@ export type AdminProfileInput = { wervernaam: string; wervernr: string; isAdmin:
 
 export const adminApi = {
   list: () => invoke<{ users: AdminUser[] }>("admin-users", { action: "list" }).then((result) => result.users),
-  invite: (email: string, profile: AdminProfileInput) =>
-    invoke("admin-users", { action: "invite", email, redirectTo: window.location.origin, ...profile }),
+  invite: (email: string, profile: AdminProfileInput) => invoke("admin-users", { action: "invite", email, ...profile }),
   update: (id: string, profile: AdminProfileInput) => invoke("admin-users", { action: "update", id, ...profile }),
   resendInvite: (id: string) =>
     invoke("admin-users", { action: "resendInvite", id, redirectTo: window.location.origin }),

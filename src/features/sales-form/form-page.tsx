@@ -3,7 +3,7 @@ import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import type { Session } from "@supabase/supabase-js"
-import { formSchema, type FormInput, type FormValues } from "@shared/form-schema"
+import type { FormInput, FormValues } from "@shared/form-schema"
 import { Spinner } from "@/components/ui/spinner"
 import { ChangePasswordDialog } from "@/features/auth/change-password-dialog"
 import { useOnline } from "@/hooks/use-online"
@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase"
 import { OutboxDialog } from "../outbox/outbox-dialog"
 import type { OutboxItem } from "../outbox/outbox-store"
 import { useOutbox } from "../outbox/use-outbox"
+import { salesFormSchema } from "./contract-date"
 import { clearDraft } from "./draft-store"
 import { createEmptyForm } from "./form-defaults"
 import { FormHeader } from "./form-header"
@@ -21,16 +22,22 @@ import { ScanOverlay } from "./scan-overlay"
 import { useDraft } from "./use-draft"
 import { useScanFill } from "./use-scan-fill"
 
-type Props = { session: Session; onOpenDashboard: () => void; onOpenSales: () => void; onOpenAdmin: () => void }
+type Props = {
+  session: Session
+  onOpenDashboard: () => void
+  onOpenMap: () => void
+  onOpenSales: () => void
+  onOpenAdmin: () => void
+}
 
 /** Main page after login: header, the sales form, the outbox dialog and the scan overlay. */
-export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }: Props) {
+export function FormPage({ session, onOpenDashboard, onOpenMap, onOpenSales, onOpenAdmin }: Props) {
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
   const outbox = useOutbox(userId)
   const form = useForm<FormInput, unknown, FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(salesFormSchema),
     defaultValues: createEmptyForm(),
     mode: "onTouched",
   })
@@ -102,6 +109,7 @@ export function FormPage({ session, onOpenDashboard, onOpenSales, onOpenAdmin }:
         syncing={outbox.syncing}
         onOpenOutbox={() => setOutboxOpen(true)}
         onOpenDashboard={onOpenDashboard}
+        onOpenMap={onOpenMap}
         onOpenSales={onOpenSales}
         onOpenAdmin={onOpenAdmin}
         onChangePassword={() => setChangingPassword(true)}

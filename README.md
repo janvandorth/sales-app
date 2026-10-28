@@ -41,7 +41,7 @@ npm run dev
      │                                         └───────────────────────────────────▶ Contracts API onboarding
      │                                    sync-sheet (hourly, pg_cron) appends rows not in the sheet yet
      │                                    sync-onboarding (hourly, pg_cron) sends rows without an onboarding answer
-     ├─ werver picker (admins only) ────▶ recruiters ──────────────────────────────────▶ Contracts API recruiters
+     ├─ werver picker (admins only) ────▶ recruiters ──▶ profiles (not admins)
      ├─ dashboard ──────────────────────▶ kpi ─────────────────────────────────────────▶ Contracts API stats (ZMAdmin)
      └─ admin page (admins only) ───────▶ admin-users ──▶ auth admin API, profiles, profile_changes
 ```
@@ -88,8 +88,8 @@ scripts/                        check-functions.sh and repo-level tests
 **Submitting a form.** The app validates with `formSchema`, then `useOutbox().submit()` sends it to
 `submit-form`. The server validates again with the same schema, adds the recruiter from the caller's profile,
 stores the row and appends it to the sheet. An admin may book the sale on another recruiter: the form then shows a
-"Werver" picker with ZMAdmin's active recruiters (`recruiters` function, `GET …/Recruiters` from the environment the
-sale is onboarded in, with the onboarding key) and sends the pick as `werver`; `submit-form` ignores it for anyone
+"Werver" picker with the app's recruiters that are not admins (`recruiters` function, read from `profiles`) and
+sends the pick as `werver`; `submit-form` ignores it for anyone
 who is not an admin. The sale keeps the admin's `user_id`, so it shows in the admin's "Mijn verkopen". If the phone is offline or the session expired, the form goes to the
 outbox (IndexedDB) and is sent automatically later. Every form has a `rowId` generated on the phone, so sending
 it twice never creates a duplicate.
@@ -111,8 +111,10 @@ background (`EdgeRuntime.waitUntil`), waiting up to 60 s for the answer. A timeo
 resent automatically, because the sale may have arrived; check ZMAdmin and set `onboarding_status` back to null to
 have `sync-onboarding` resend it.
 
-**Dashboard.** Account menu → "Mijn resultaten" (recruiters) or "Resultaten team" (admins). The `kpi` function
-reads ZMAdmin through the Contracts API (`GET …/Sales/2026.1/Stats`, ZMSuite branch `Jan/feature/sales-stats`):
+**Dashboard.** Account menu → "Mijn resultaten" (recruiters) or "Resultaten team" (admins), only on the test
+deployment and in development for now. The `kpi` function
+reads ZMAdmin through the Contracts API on TEST (`GET http://test.zekerenmobiel.nl/Sales/2026.1/Stats`, ZMSuite
+branch `Jan/feature/sales-stats`):
 gross sales per day and recruiter, with each cancellation counted on the day of the sale, plus the cancelled
 customers with their reason. A recruiter always gets their own wervernr (which must be their ZMAdmin recruiter
 code); only admins may pick another recruiter or the whole team. "Opzeggingen bijgewerkt t/m" is the most recent
@@ -121,7 +123,45 @@ app loads a year at a time going back ("Eerder"). Without `STATS_API_KEY` the fu
 made-up numbers and the page says so. In development, open `http://localhost:5173/?demo` (sales manager) or
 `?demo=werver` to see the dashboard with demo data without logging in.
 
-**Login.** Accounts are invite-only (sign-ups are disabled). An invite or password-reset email opens the app on
+**Sales map.** Account menu → "Verkoopkaart", shown together with the dashboard. Everyone sees where the whole
+team sold in the last 30 days, 90 days or year, cancelled sales included. The `sales-map` function reads
+`GET http://test.zekerenmobiel.nl/Sales/2026.1/Map` with `STATS_API_KEY`: sales per full postcode, answered from the
+same in-memory cache as the stats (refreshed every 15 minutes), and sums them to PC4 areas. Colour is the age of an
+area's newest sale (red today, yellow, grey at the start of the period); darker means more sales, in five shades on a
+log scale. Admins also see the numbers: per area, per recruiter and in total. For recruiters the function sends only
+the shade, never a count. In development: `?demo&kaart` (admin) or `?demo=werver&kaart`.
+
+**Kansen.** The map's second view: where households are still "for grabs". The `sales-opportunities` function reads
+`GET …/Sales/2026.1/Opportunities?woz=low|mid|high`, where the Contracts API counts per street (PC6): CBS households
+minus our active customers (not archived, counted nightly), for the streets whose average WOZ value falls in the
+band (each band a third of all households), added up per PC4. So one promising street is never averaged away by the
+streets around it. The map shades PC4 areas in blue by open households; tapping one asks
+`…/Opportunities/{pc4}` for its best streets, with names from ZMPostcode. Admins see households, customers, open
+households and WOZ per area and per street; recruiters see only the shades and the ranked streets. All numbers are
+computed in the backend; the app only draws what it receives.
+
+**Zooming in.** From zoom 11 the map shows PC5 areas, from zoom 13 the streets (PC6), each asked for per view
+(`…/Map/Pc5`, `…/Map/Pc6`, `…/Opportunities/Pc5`, `…/Opportunities/Pc6` with `bbox`). A PC5 is ranked by its
+best street like a PC4; a street by itself on the national street scale. The answers hold only postcodes and what
+they are coloured by (and the numbers for admins); shades seen while zoomed in are kept while panning, up to 40,000
+per level, and let go when zooming out to PC4 or changing the filter.
+
+**Outlines.** All areas are vector tiles: `pc4.pmtiles` (zoom 5–10, 1.5 MB), `pc5.pmtiles` (zoom 11, 4 MB) and
+`pc6.pmtiles` (zoom 13, 26 MB), of which the map reads only the tiles in view. They hold just the postcode and are
+built once a year from the CBS GeoPackages (cbs.nl > Gegevens per postcode > Downloads) and PC4 from PDOK:
+
+```sh
+node scripts/build-postcode-tiles.mjs cbs_pc5_2025_v1.gpkg cbs_pc6_2025_v1.gpkg 2024 public/tiles
+```
+
+Upload the three files to the public Supabase Storage bucket `postcode-tiles` under `2025/` (a new folder per CBS
+year, so browsers never mix years), or point `VITE_POSTCODE_TILES_URL` elsewhere; in development `public/tiles`
+(git-ignored) with `VITE_POSTCODE_TILES_URL=/tiles`. The map credits CBS and Esri Nederland for the areas and PDOK
+for the background, as their licences require.
+
+**Login.** Sign-ups are disabled. An admin adds a recruiter on the admin page ("Werver toevoegen"): the account is
+active at once with the password `tijdelijkwachtwoord` (`TEMPORARY_PASSWORD` in `_shared/admin-types.ts`), which
+the recruiter changes from the account menu; no email is sent. Accounts invited by email before that still work. An invite or password-reset email opens the app on
 the set-password screen. If the server rejects a session (e.g. revoked), the app refreshes it once and
 otherwise signs out on that device only.
 
@@ -214,12 +254,11 @@ Project ref `nrdpixagvynzexwzqtlf`. Set secrets with
 | `ALLOWED_ORIGINS`         | Browser origins allowed to call the functions (comma separated, `*` wildcard)                       |
 | `CRON_SECRET`             | Shared secret for the hourly `sync-sheet` call (pg_cron); also in Vault as `sync_sheet_cron_secret` |
 | `ONBOARDING_API_ENV`      | `production` or unset (= test); URLs are in `supabase/functions/_shared/contracts-api.ts`           |
-| `ONBOARDING_API_KEY`      | `X-API-Key` for the Contracts API onboarding endpoint (also used for the recruiter list)            |
+| `ONBOARDING_API_KEY`      | `X-API-Key` for the Contracts API onboarding endpoint                                               |
 | `ONBOARDING_TEST_API_ENV` | Where test sales are onboarded: `production` or unset (= test)                                      |
 | `ONBOARDING_TEST_API_KEY` | Optional key for test sales; must fit `ONBOARDING_TEST_API_ENV`                                     |
 | `TEST_ORIGINS`            | Origins of the test deployment (format as `ALLOWED_ORIGINS`, and allowed by CORS too)               |
-| `STATS_API_ENV`           | `production` or unset (= test), like `ONBOARDING_API_ENV`                                           |
-| `STATS_API_KEY`           | `X-API-Key` for the stats endpoint; without it the dashboard shows demo numbers                     |
+| `STATS_API_KEY`           | `X-API-Key` of TEST, home of the stats and map endpoints; without it both show demo numbers         |
 
 ### Recruiters
 

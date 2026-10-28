@@ -1,25 +1,20 @@
 import { optionalEnv } from "./env.ts"
 
-// Endpoints of the Zeker en Mobiel Contracts API. Each endpoint has its own switch, so one can go live while the
-// other stays on TEST: ONBOARDING_API_ENV and STATS_API_ENV. "production" uses contracts.zekerenmobiel.nl, unset or
-// "test" uses test.zekerenmobiel.nl. The matching *_API_KEY secret must hold the key for that environment.
-// Sales from the test deployment (test = true, see test-request.ts) have their own switch, ONBOARDING_TEST_API_ENV,
-// which defaults to TEST whatever ONBOARDING_API_ENV says.
+// Endpoints of the Zeker en Mobiel Contracts API. Onboarding has a switch, ONBOARDING_API_ENV: "production" uses
+// contracts.zekerenmobiel.nl, unset or "test" uses test.zekerenmobiel.nl, and ONBOARDING_API_KEY must hold the key
+// for that environment. Sales from the test deployment (test = true, see test-request.ts) have their own switch,
+// ONBOARDING_TEST_API_ENV, which defaults to TEST whatever ONBOARDING_API_ENV says.
+// The stats and map endpoints are only on TEST so far, so the dashboard and the map always read TEST, with
+// STATS_API_KEY as TEST's key.
 
 const ONBOARDING_URL = {
   test: "http://test.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper",
   production: "https://contracts.zekerenmobiel.nl/Onboarding/2026.1/Appeee/Paper",
 }
 
-const RECRUITERS_URL = {
-  test: "http://test.zekerenmobiel.nl/Recruiters",
-  production: "https://contracts.zekerenmobiel.nl/Recruiters",
-}
-
-const STATS_URL = {
-  test: "http://test.zekerenmobiel.nl/Sales/2026.1/Stats",
-  production: "https://contracts.zekerenmobiel.nl/Sales/2026.1/Stats",
-}
+const STATS_URL = "http://test.zekerenmobiel.nl/Sales/2026.1/Stats"
+const MAP_URL = "http://test.zekerenmobiel.nl/Sales/2026.1/Map"
+const OPPORTUNITIES_URL = "http://test.zekerenmobiel.nl/Sales/2026.1/Opportunities"
 
 function environment(secret: string): "test" | "production" {
   const value = optionalEnv(secret) ?? "test"
@@ -39,15 +34,20 @@ export function onboardingEnvironment(test: boolean): "test" | "production" {
   return environment(test ? "ONBOARDING_TEST_API_ENV" : "ONBOARDING_API_ENV")
 }
 
-/**
- * GET endpoint with ZMAdmin's active recruiters. Read from the same environment the sale is onboarded in (and with
- * the same key), so a picked recruiter code exists where the sale lands.
- */
-export function recruitersUrl(test: boolean): string {
-  return RECRUITERS_URL[onboardingEnvironment(test)]
-}
-
 /** GET endpoint with sales and cancellations for the dashboard. */
 export function statsUrl(): string {
-  return STATS_URL[environment("STATS_API_ENV")]
+  return STATS_URL
+}
+
+/** GET endpoint with sales per postcode for the map; on TEST and with STATS_API_KEY, like the stats. */
+export function mapUrl(): string {
+  return MAP_URL
+}
+
+/**
+ * GET endpoints with households not yet a customer: per PC4, with a PC4 its best streets, or with "Pc5" or "Pc6" the
+ * areas in a view. TEST, STATS_API_KEY.
+ */
+export function opportunitiesUrl(pc4?: string): string {
+  return pc4 ? `${OPPORTUNITIES_URL}/${pc4}` : OPPORTUNITIES_URL
 }

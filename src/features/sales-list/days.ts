@@ -1,7 +1,7 @@
 import { addDays, formatDay, today } from "../dashboard/periods"
 
-/** How far back the list goes: today and the seven days before it. */
-export const MAX_DAYS_BACK = 7
+/** How far back the list goes: today and the 31 days before it. */
+export const MAX_DAYS_BACK = 31
 
 const WEEKDAYS = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"]
 

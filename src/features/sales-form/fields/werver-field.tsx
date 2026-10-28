@@ -15,7 +15,7 @@ import type { SalesFormControl } from "../form-types"
 
 type Props = { control: SalesFormControl; profile: Profile }
 
-/** Admins only: the recruiter the sale is booked on, from ZMAdmin's list. Empty means the admin themself. */
+/** Admins only: the recruiter the sale is booked on, from the app's non-admin recruiters. Empty means the admin themself. */
 export function WerverField({ control, profile }: Props) {
   const [open, setOpen] = useState(false)
   const recruiters = useQuery({ queryKey: ["recruiters"], queryFn: listRecruiters, staleTime: 60 * 60_000 })
@@ -68,9 +68,9 @@ export function WerverField({ control, profile }: Props) {
                     {recruiters.data?.map((werver) => (
                       <CommandItem
                         key={werver.wervernr}
-                        value={`${werver.wervernaam} ${werver.wervernr} ${werver.company}`}
+                        value={`${werver.wervernaam} ${werver.wervernr}`}
                         onSelect={() => {
-                          field.onChange({ wervernaam: werver.wervernaam, wervernr: werver.wervernr })
+                          field.onChange(werver)
                           setOpen(false)
                         }}
                       >
