@@ -101,7 +101,7 @@ export function AppMenu() {
           {SHOW_RESULTS && page("map", <MapIcon />, "Verkoopkaart")}
           {SHOW_AREAS &&
             (admin
-              ? page("planning", <CalendarDaysIcon />, "Planning")
+              ? page("planning", <CalendarDaysIcon />, "Werkgebieden")
               : page("areas", <MapPinnedIcon />, "Mijn gebieden"))}
           {admin && page("admin", <UsersIcon />, "Beheer wervers")}
           <DropdownMenuSeparator />

@@ -31,7 +31,7 @@ const PATHS: Record<View, string> = {
   map: "/kaart",
   sales: "/verkopen",
   admin: "/beheer",
-  planning: "/planning",
+  planning: "/werkgebieden",
   areas: "/gebieden",
   walk: "/lopen",
 }

@@ -27,12 +27,12 @@ import { supabase } from "@/lib/supabase"
 // Loaded on first use: MapLibre is large and the sales form should not wait for it.
 const SalesMapPage = lazy(() => import("@/features/sales-map/map-page").then((m) => ({ default: m.SalesMapPage })))
 
-/** Dev only: `?demo&verkopen`, `?demo&kaart`, `?demo&planning` or `?demo=werver&gebieden` opens that page. */
+/** Dev only: `?demo&verkopen`, `?demo&kaart`, `?demo&werkgebieden` or `?demo=werver&gebieden` opens that page. */
 function demoView(): View {
   const params = new URLSearchParams(window.location.search)
   if (params.has("verkopen")) return "sales"
   if (params.has("kaart")) return "map"
-  if (params.has("planning")) return "planning"
+  if (params.has("werkgebieden")) return "planning"
   if (params.has("gebieden")) return "areas"
   return "dashboard"
 }

@@ -85,7 +85,7 @@ export function PlanningPage({ onBack, onAssign, onShow, onViewAs }: Props) {
             <ArrowLeftIcon />
           </Button>
         }
-        title="Planning"
+        title="Werkgebieden"
         end={<AppMenu />}
       />
 
