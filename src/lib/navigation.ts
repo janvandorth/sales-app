@@ -18,7 +18,7 @@ export type Page = {
   map?: MapStart
   /** The werver whose areas a manager opened from the planning. */
   viewedAs?: AreaMember
-  /** The area being walked door by door. */
+  /** The area being walked door by door; on the form, the walk it was opened from. */
   walking?: AreaAssignment
 }
 

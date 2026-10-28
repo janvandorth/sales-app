@@ -24,7 +24,7 @@ export function PageHeader({ start, title, end }: Props) {
     <header className="sticky top-0 z-40 border-b bg-primary pt-[env(safe-area-inset-top)] text-primary-foreground">
       <div className={`mx-auto flex h-14 items-center gap-2 px-4 ${PAGE_WIDTH}`}>
         {start}
-        <h1 className="flex flex-1 justify-center text-lg font-semibold">{title}</h1>
+        <h1 className="flex min-w-0 flex-1 justify-center text-lg font-semibold">{title}</h1>
         {end}
       </div>
     </header>
