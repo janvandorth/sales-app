@@ -23,6 +23,12 @@ export const KANSEN_COLORS = ["#dbeafe", "#93c5fd", "#3b82f6", "#1d4ed8", "#1e3a
 /** "Kansen": opacity per level; the bottom half is a faint tint only. */
 export const KANSEN_OPACITY = [0.15, 0.4, 0.6, 0.8, 0.92]
 
+/**
+ * At street zoom every opacity is multiplied by this, so the darkest shade (0.92) stays near 0.6: the street under
+ * it remains readable, and the colour still tells the levels apart.
+ */
+export const STREET_OPACITY = 0.65
+
 /** A per-level value from `values` as a MapLibre expression on `level`; level 1 for anything unknown. */
 function byLevel(level: ExpressionSpecification, values: (string | number)[]): ExpressionSpecification {
   return ["match", level, 2, values[1], 3, values[2], 4, values[3], 5, values[4], values[0]] as ExpressionSpecification
