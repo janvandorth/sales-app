@@ -522,6 +522,7 @@ export async function recordDoorVisit(
     .single()
   if (error) {
     if (!navigator.onLine) throw new NetworkError("Geen verbinding: deze deur is niet opgeslagen")
+    console.error("door_visits insert", error)
     throw new ApiError("De deur kon niet worden opgeslagen", 500)
   }
   return (data as { id: string }).id

@@ -107,7 +107,8 @@ export default function App() {
       return (
         <WalkPage
           area={walking}
-          wervernr={viewedAs?.wervernr ?? profile?.wervernr}
+          // Doors are logged under whoever walks, also a manager on a werver's page; they count for the area.
+          wervernr={profile?.wervernr}
           onBack={() => setView("areas")}
           onSold={(door) => {
             setSoldAt(door)
