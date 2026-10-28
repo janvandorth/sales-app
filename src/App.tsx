@@ -139,7 +139,8 @@ export default function App() {
           onBack={() => back({ view: "areas", viewedAs })}
           onSold={(door) => {
             setSoldAt(door)
-            go(FORM)
+            // The walk travels along, so the form can lead back to it.
+            go({ view: "form", walking, viewedAs })
           }}
           onShowMap={() => openMap({ focus: walking })}
         />
@@ -177,6 +178,7 @@ export default function App() {
         onOpenSales={() => go({ view: "sales" })}
         soldAt={soldAt}
         onSoldAtFilled={() => setSoldAt(null)}
+        onBack={walking ? () => back({ view: "walk", walking, viewedAs }) : undefined}
       />
     )
   }

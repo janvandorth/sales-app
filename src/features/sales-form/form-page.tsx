@@ -31,11 +31,13 @@ type Props = {
   /** A door marked "Verkocht" while walking: its address goes into the form. */
   soldAt?: Door | null
   onSoldAtFilled?: () => void
+  /** Back to the walk the form was opened from; unset when it was opened any other way. */
+  onBack?: () => void
 }
 
 /** Main page after login: header, the sales form, the outbox dialog and the scan overlay. */
 export function FormPage(props: Props) {
-  const { session, outboxOpen, onOutboxOpenChange: setOutboxOpen, onOpenSales, soldAt, onSoldAtFilled } = props
+  const { session, outboxOpen, onOutboxOpenChange: setOutboxOpen, onOpenSales, soldAt, onSoldAtFilled, onBack } = props
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
@@ -100,6 +102,7 @@ export function FormPage(props: Props) {
         online={online}
         scanDisabled={!online || scanFill.phase !== null}
         onScan={() => photoInput.current?.click()}
+        onBack={onBack}
       />
       <input
         ref={photoInput}
