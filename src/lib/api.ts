@@ -438,11 +438,12 @@ export async function streetDoors(street: Street): Promise<Door[]> {
     huisnummertoevoeging?: string
     straatnaam: string
     woonplaatsnaam: string
+    centroide_ll?: string
   }
   const quoted = street.name.replace(/(["\\])/g, "\\$1")
   const docs = await pdokAll<Doc>(
     ["type:adres", `postcode:(${street.postcodes.join(" OR ")})`, `straatnaam:"${quoted}"`],
-    "postcode,huisnummer,huisletter,huisnummertoevoeging,straatnaam,woonplaatsnaam",
+    "postcode,huisnummer,huisletter,huisnummertoevoeging,straatnaam,woonplaatsnaam,centroide_ll",
   )
   return docs.map((d) => ({
     postcode: d.postcode,
@@ -450,6 +451,7 @@ export async function streetDoors(street: Street): Promise<Door[]> {
     toevoeging: toevoeging(d.huisletter, d.huisnummertoevoeging),
     straat: d.straatnaam,
     plaats: d.woonplaatsnaam,
+    at: d.centroide_ll ? point(d.centroide_ll) : undefined,
   }))
 }
 

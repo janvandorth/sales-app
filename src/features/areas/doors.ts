@@ -6,7 +6,15 @@
 
 export type Outcome = "not_home" | "no_interest" | "later" | "sold" | "skip"
 
-export type Door = { postcode: string; huisnummer: number; toevoeging: string; straat: string; plaats: string }
+export type Door = {
+  postcode: string
+  huisnummer: number
+  toevoeging: string
+  straat: string
+  plaats: string
+  /** Where the address is, [lon, lat]; unknown for a door only known from a visit. */
+  at?: [number, number]
+}
 
 export type DoorVisit = Door & {
   id: string
@@ -87,6 +95,21 @@ export function distance([lon1, lat1]: [number, number], [lon2, lat2]: [number, 
 export function byDistance(streets: Street[], at: [number, number]): Street[] {
   const near = (s: Street) => Math.min(...s.points.map((p) => distance(p, at)))
   return [...streets].sort((a, b) => near(a) - near(b))
+}
+
+/** The door whose address lies nearest to `here`, with its side; null when no door has a location. */
+export function nearestDoor(doors: Door[], here: [number, number]): { door: Door; side: "even" | "odd" } | null {
+  let best: Door | null = null
+  let bestDistance = Infinity
+  for (const d of doors) {
+    if (!d.at) continue
+    const metres = distance(d.at, here)
+    if (metres < bestDistance) {
+      best = d
+      bestDistance = metres
+    }
+  }
+  return best && { door: best, side: best.huisnummer % 2 === 0 ? "even" : "odd" }
 }
 
 /** The newest visit per door. */
