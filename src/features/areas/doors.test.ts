@@ -4,6 +4,7 @@ import {
   doorLabel,
   firstOpen,
   latestVisits,
+  nearestDoor,
   sides,
   streetsOf,
   stripRange,
@@ -83,5 +84,21 @@ describe("streets", () => {
   it("puts the street nearest to the phone first", () => {
     expect(byDistance(streetsOf(places), [5.1301, 52.1301])[0].name).toBe("Merelstraat")
     expect(byDistance(streetsOf(places), [5.1121, 52.1209])[0].name).toBe("Lijsterlaan")
+  })
+})
+
+describe("the door where the phone is", () => {
+  it("finds the nearest address and its side", () => {
+    const doors = [
+      { ...door(69), at: [4.8801, 52.3701] as [number, number] },
+      { ...door(71), at: [4.8805, 52.3703] as [number, number] },
+      { ...door(72), at: [4.8812, 52.3709] as [number, number] },
+    ]
+    expect(nearestDoor(doors, [4.8806, 52.3703])).toMatchObject({ door: { huisnummer: 71 }, side: "odd" })
+    expect(nearestDoor(doors, [4.8813, 52.371])).toMatchObject({ door: { huisnummer: 72 }, side: "even" })
+  })
+
+  it("finds nothing without locations", () => {
+    expect(nearestDoor([door(2)], [4.88, 52.37])).toBeNull()
   })
 })

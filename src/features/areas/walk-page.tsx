@@ -19,6 +19,7 @@ import {
   doorLabel,
   firstOpen,
   latestVisits,
+  nearestDoor,
   OUTCOME_LABELS,
   sides,
   streetsOf,
@@ -107,6 +108,18 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
   const list = both[side]
   const at = `${street?.key}|${side}`
   const [positions, setPositions] = useState<Record<string, number>>({})
+
+  // With a location, a street opens at the door nearest to the phone, once per street (and again on "Waar ik ben").
+  const [snapped, setSnapped] = useState<string | null>(null)
+  if (position && street && doors.data && snapped !== street.key) {
+    setSnapped(street.key)
+    const near = nearestDoor(doors.data, position)
+    if (near) {
+      setSide(near.side)
+      const onSide = both[near.side].findIndex((d) => doorKey(d) === doorKey(near.door))
+      setPositions((p) => ({ ...p, [`${street.key}|${near.side}`]: onSide }))
+    }
+  }
   const index = Math.min(positions[at] ?? firstOpen(list, latest), Math.max(0, list.length - 1))
   const door = list[index] as Door | undefined
   const moveTo = (i: number) => setPositions((p) => ({ ...p, [at]: Math.max(0, Math.min(list.length - 1, i)) }))
@@ -179,8 +192,16 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
 
         {streets.length > 1 && (
           <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4" role="group" aria-label="Straat">
-            {picked !== null && position && (
-              <Button variant="outline" size="sm" className="h-9 shrink-0 rounded-full" onClick={() => setPicked(null)}>
+            {position && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 shrink-0 rounded-full"
+                onClick={() => {
+                  setPicked(null)
+                  setSnapped(null)
+                }}
+              >
                 <LocateFixedIcon /> Waar ik ben
               </Button>
             )}
