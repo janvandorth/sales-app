@@ -1,5 +1,5 @@
 // Builds the outlines under the sales map as three vector-tile archives (PMTiles): pc4.pmtiles (zoom 5 to 10),
-// pc5.pmtiles (zoom 11) and pc6.pmtiles (zoom 14). The map shows each up to the next level, MapLibre stretching the
+// pc5.pmtiles (zoom 11) and pc6.pmtiles (zoom 13). The map shows each up to the next level, MapLibre stretching the
 // last zoom; the tiles hold only the postcode, as `postcode`, and the backend sends what each is shaded by. Run it
 // once a year, when CBS publishes "Kerncijfers per postcode" (cbs.nl > Gegevens per postcode > Downloads):
 //
@@ -32,7 +32,7 @@ const ATTRIBUTION = "Postcodegebieden: CBS, Esri Nederland"
 
 await build("pc4", [5, 6, 7, 8, 9, 10], [await pdokPc4(pc4Year)])
 await build("pc5", [11], gpkgChunks(pc5Gpkg, "postcode5", /^[1-9]\d{3}[A-Z]$/, 6))
-await build("pc6", [14], gpkgChunks(pc6Gpkg, "postcode6", /^[1-9]\d{3}[A-Z]{2}$/, 9))
+await build("pc6", [13], gpkgChunks(pc6Gpkg, "postcode6", /^[1-9]\d{3}[A-Z]{2}$/, 8))
 
 /**
  * Tiles one layer at `zooms` and writes `<name>.pmtiles`. `chunks` yields groups of areas with their bounds, each

@@ -10,7 +10,6 @@ import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
 import { getSalesMap, getSalesOpportunities } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
@@ -42,7 +41,7 @@ const TILES_URL =
 const PC5_ZOOM = 11
 
 /** From this zoom the streets (PC6) in view take the place of the PC5 areas. */
-const STREET_ZOOM = 14
+const STREET_ZOOM = 13
 
 /** From this zoom on the way in, a hint says smaller areas come when zooming in further. */
 const ZOOM_HINT = 10
@@ -54,7 +53,7 @@ const FAINT = 0.2
  * Shades kept per level while zoomed in, so panning back needs no new answer; beyond this only the current view's
  * are kept. Zooming out to PC4 or changing the filter lets them all go.
  */
-const MAX_KEPT = 20_000
+const MAX_KEPT = 40_000
 
 /** Answers for one view are dropped from the query cache this soon after the view is left. */
 const VIEW_CACHE_MS = 30_000
@@ -163,13 +162,16 @@ export function SalesMapPage({ onBack }: Props) {
   }
   const current = seen.key === filter ? seen : nothingSeen(filter)
 
+  /** The level the map crossed into while its tiles are not all drawn yet; reported by the map as it zooms. */
+  const [drawing, setDrawing] = useState<Level | null>(null)
+
   // Zoomed in to streets, the PC5 areas stay until the first streets have arrived, so the map never goes blank.
   const shown: Level =
     bbox === null ? "pc4" : level === "pc6" && current.pc6.size === 0 && detailQuery.isFetching ? "pc5" : level
   // PC4 fades to a tint only once the finer level has something to show.
   const faint = shown !== "pc4" && current[shown].size > 0
-  const loading =
-    bbox === null || !detailQuery.isFetching ? null : level === "pc5" ? "Gebieden laden…" : "Straten laden…"
+  const loadingLevel = drawing ?? (bbox !== null && detailQuery.isFetching ? level : null)
+  const loading = loadingLevel === null ? null : loadingLevel === "pc6" ? "Straten laden…" : "Gebieden laden…"
   // Close to the next level, or zoomed in on a view too wide for it (the backend refuses those): say where to go.
   const zoomHint =
     (bbox === null && view.zoom >= ZOOM_HINT) || (bbox !== null && detailQuery.isError)
@@ -278,10 +280,12 @@ export function SalesMapPage({ onBack }: Props) {
           faint={faint}
           popup={popup}
           onView={setView}
+          onDrawing={setDrawing}
         />
         {loading ? (
-          <div role="status" className={BADGE_CLASS}>
-            <Spinner className="size-5" />
+          // A pulse of opacity only: the browser runs it on the compositor, without JavaScript or repainting the map.
+          <div role="status" className={cn(BADGE_CLASS, "animate-pulse motion-reduce:animate-none")}>
+            <span className="size-2.5 rounded-full bg-primary" />
             {loading}
           </div>
         ) : (
@@ -330,6 +334,8 @@ type MapProps = {
   popup: { current: PopupFor }
   /** Called a moment after the map stops moving. */
   onView: (view: MapView) => void
+  /** Called as soon as zooming crosses into another level, and with null once its tiles are all drawn. */
+  onDrawing: (level: Level | null) => void
 }
 
 /**
@@ -344,16 +350,18 @@ const LEVELS: Level[] = ["pc4", "pc5", "pc6"]
  * The MapLibre map. All three levels are vector tiles from TILES_URL, coloured by feature state, so new numbers
  * never reload an outline. MapLibre keeps only the tiles near the view in memory.
  */
-function SalesMap({ mode, shades, seen, shown, faint, popup, onView }: MapProps) {
+function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }: MapProps) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const viewChanged = useRef(onView)
+  const drawingChanged = useRef(onDrawing)
   const shownRef = useRef(shown)
   const [loaded, setLoaded] = useState(false)
   useEffect(() => {
     viewChanged.current = onView
+    drawingChanged.current = onDrawing
     shownRef.current = shown
-  }, [onView, shown])
+  }, [onView, onDrawing, shown])
 
   useEffect(() => {
     if (!container.current) return
@@ -416,17 +424,37 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView }: MapProps)
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
     map.on("load", () => setLoaded(true))
 
+    // Say at once when zooming crosses into another level: one comparison per frame, and the page only hears of a
+    // change. Cleared once the map is idle (all tiles drawn), but not before the view below has been sent, so the
+    // badge carries on into the answer's loading without flickering off in between.
+    let crossed = levelAt(map.getZoom())
+    let viewPending = false
+    map.on("zoom", () => {
+      const now = levelAt(map.getZoom())
+      if (now === crossed) return
+      crossed = now
+      drawingChanged.current(now)
+    })
+    map.on("idle", () => {
+      if (!viewPending) drawingChanged.current(null)
+    })
+
     // Tell the page the zoom and, zoomed in, which areas to ask for; a moment after the map stops, not every frame.
     let wait: ReturnType<typeof setTimeout> | undefined
     map.on("moveend", () => {
       clearTimeout(wait)
+      viewPending = true
       wait = setTimeout(() => {
+        viewPending = false
         const zoom = map.getZoom()
         const level = zoom >= STREET_ZOOM ? "pc6" : "pc5"
-        if (zoom < PC5_ZOOM) return viewChanged.current({ zoom, bbox: null, level })
-        const b = map.getBounds()
-        const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(3)).join(",")
-        viewChanged.current({ zoom, bbox, level })
+        if (zoom < PC5_ZOOM) viewChanged.current({ zoom, bbox: null, level })
+        else {
+          const b = map.getBounds()
+          const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(3)).join(",")
+          viewChanged.current({ zoom, bbox, level })
+        }
+        if (map.areTilesLoaded()) drawingChanged.current(null)
       }, 400)
     })
 
@@ -509,6 +537,9 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView }: MapProps)
   // The container itself fills the space: MapLibre's stylesheet makes it position: relative, so absolute won't hold.
   return <div ref={container} className="min-h-0 flex-1" />
 }
+
+/** The level a zoom shows. */
+const levelAt = (zoom: number): Level => (zoom >= STREET_ZOOM ? "pc6" : zoom >= PC5_ZOOM ? "pc5" : "pc4")
 
 /** Where each level's tiles start; a level is drawn from there until the next one takes over. */
 const MIN_ZOOM: Record<Level, number> = { pc4: 0, pc5: PC5_ZOOM, pc6: STREET_ZOOM }

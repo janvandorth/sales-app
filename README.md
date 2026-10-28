@@ -140,14 +140,14 @@ streets around it. The map shades PC4 areas in blue by open households; tapping 
 households and WOZ per area and per street; recruiters see only the shades and the ranked streets. All numbers are
 computed in the backend; the app only draws what it receives.
 
-**Zooming in.** From zoom 11 the map shows PC5 areas, from zoom 14 the streets (PC6), each asked for per view
+**Zooming in.** From zoom 11 the map shows PC5 areas, from zoom 13 the streets (PC6), each asked for per view
 (`…/Map/Pc5`, `…/Map/Pc6`, `…/Opportunities/Pc5`, `…/Opportunities/Pc6` with `bbox`). A PC5 is ranked by its
 best street like a PC4; a street by itself on the national street scale. The answers hold only postcodes and what
-they are coloured by (and the numbers for admins); shades seen while zoomed in are kept while panning, up to 20,000
+they are coloured by (and the numbers for admins); shades seen while zoomed in are kept while panning, up to 40,000
 per level, and let go when zooming out to PC4 or changing the filter.
 
 **Outlines.** All areas are vector tiles: `pc4.pmtiles` (zoom 5–10, 1.5 MB), `pc5.pmtiles` (zoom 11, 4 MB) and
-`pc6.pmtiles` (zoom 14, 37 MB), of which the map reads only the tiles in view. They hold just the postcode and are
+`pc6.pmtiles` (zoom 13, 26 MB), of which the map reads only the tiles in view. They hold just the postcode and are
 built once a year from the CBS GeoPackages (cbs.nl > Gegevens per postcode > Downloads) and PC4 from PDOK:
 
 ```sh
