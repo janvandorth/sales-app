@@ -9,8 +9,10 @@ import { areaTitle, firstName, isoWeek, routeUrl, runsOn, spanLabel, weekday, ty
 import { useAreaAssignments } from "./use-areas"
 
 type Props = {
-  /** The werver's own number, to leave them out of "met …". */
+  /** Whose areas: the werver's own number, also to leave them out of "met …". */
   wervernr: string | undefined
+  /** Set when a manager looks at a werver's list: the page is titled with their name. */
+  viewedAs?: string
   onBack: () => void
   /** Opens the map on an area. */
   onShow: (area: AreaAssignment) => void
@@ -24,11 +26,12 @@ const DAYS_AHEAD = 42
  * Where the werver goes: today's areas up top with the way there, then the rest of the week, later weeks and the
  * past two weeks. Kansen show as shades on the map, as everywhere for wervers; no numbers here.
  */
-export function MyAreasPage({ wervernr, onBack, onShow }: Props) {
+export function MyAreasPage({ wervernr, viewedAs, onBack, onShow }: Props) {
   const now = today()
   const saturday = addDays(periodStart(now, "week"), 5)
   const areas = useAreaAssignments(addDays(now, -DAYS_BACK), addDays(now, DAYS_AHEAD))
-  const all = areas.data ?? []
+  // A werver only gets their own; a manager gets everyone's, so keep the werver they opened.
+  const all = (areas.data ?? []).filter((a) => !viewedAs || (wervernr !== undefined && a.wervernrs.includes(wervernr)))
   const todays = all.filter((a) => runsOn(a, now))
   const thisWeek = all.filter((a) => a.startsOn > now && a.startsOn <= saturday)
   const later = all.filter((a) => a.startsOn > saturday)
@@ -43,7 +46,7 @@ export function MyAreasPage({ wervernr, onBack, onShow }: Props) {
             <ArrowLeftIcon />
           </Button>
         }
-        title="Mijn gebieden"
+        title={viewedAs ? `Gebieden van ${firstName(viewedAs)}` : "Mijn gebieden"}
         end={
           <Button
             variant="ghost"
