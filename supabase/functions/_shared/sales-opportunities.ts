@@ -1,5 +1,5 @@
 // Shared between the sales-opportunities edge function and the web app: where households are still "for grabs",
-// from the Contracts API (GET .../Sales/2026.1/Opportunities, .../Opportunities/{pc4} and .../Opportunities/Pc6).
+// from the Contracts API (GET .../Sales/2026.1/Opportunities, .../Opportunities/{pc4}, .../Pc5 and .../Pc6).
 // The API counts per street (PC6): CBS households minus our active customers, for the streets of a WOZ band. A PC4
 // is shaded by its best street, ranked against the best streets of all other areas, so a dark area is one with a
 // street worth zooming in to; zoomed in, each street is ranked among all streets. Everyone gets the shades; the

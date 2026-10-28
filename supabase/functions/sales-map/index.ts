@@ -3,18 +3,21 @@ import { requireUser } from "../_shared/auth.ts"
 import { mapUrl } from "../_shared/contracts-api.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
+import { isTestRequest } from "../_shared/test-request.ts"
 import { salesMapRequestSchema, salesMapSchema, salesPc5Schema, salesPc6Schema } from "../_shared/sales-map.ts"
 import { demoSalesMap } from "../_shared/sales-map-demo.ts"
 import { salesMapView, salesPc5View, salesStreetsView, type SalesMapResponse } from "../_shared/sales-map-view.ts"
 
 // Where the team sold, for the map, from ZMAdmin via the Contracts API: per PC4 (GET .../Sales/2026.1/Map), or
 // zoomed in the PC5 areas (.../Map/Pc5) or the streets (.../Map/Pc6) in the map's view. Only what the areas are
-// coloured by: their outlines are vector tiles the app reads from Storage. Everyone sees the whole team's areas, when the newest sale
-// there was and a shade for how much; only admins also get how many sales and by whom. The counts are left out
-// here, not in the app, so a recruiter's phone never receives them.
+// coloured by: their outlines are vector tiles the app reads from Storage. Everyone sees the whole team's areas,
+// when the newest sale there was and a shade for how much; only admins also get how many sales and by whom. The
+// counts are left out here, not in the app, so a recruiter's phone never receives them.
 // Without STATS_API_KEY the areas are made up (demo mode; nothing zoomed in then).
 
 serve(async (req) => {
+  // Only the test deployment shows the map for now; the production app never asks.
+  if (!isTestRequest(req)) throw new HttpError(404, "De kaart is alleen in de testversie")
   const { supabase, user } = await requireUser(req)
   const parsed = salesMapRequestSchema.safeParse(await req.json())
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? "Ongeldig verzoek")

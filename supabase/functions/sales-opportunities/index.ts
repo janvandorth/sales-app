@@ -3,6 +3,7 @@ import { requireUser } from "../_shared/auth.ts"
 import { opportunitiesUrl } from "../_shared/contracts-api.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
+import { isTestRequest } from "../_shared/test-request.ts"
 import { demoOpportunityAreas, demoOpportunityStreets } from "../_shared/sales-opportunities-demo.ts"
 import {
   opportunitiesView,
@@ -18,11 +19,14 @@ import {
 } from "../_shared/sales-opportunities.ts"
 
 // Where households are still "for grabs" for the map, from the Contracts API: per PC4, the ranked streets of one,
-// or (zoomed in) the PC5 areas or the streets in the map's view, as shades for the vector-tile outlines in the app. Everyone sees the shades and the streets; only admins get
-// households, customers and open households. The numbers are left out here, not in the app, so a recruiter's phone
-// never receives them. Without STATS_API_KEY the answers are made up (demo mode; nothing zoomed in then).
+// or (zoomed in) the PC5 areas or the streets in the map's view, as shades for the vector-tile outlines in the app.
+// Everyone sees the shades and the streets; only admins get households, customers and open households. The numbers
+// are left out here, not in the app, so a recruiter's phone never receives them. Without STATS_API_KEY the
+// answers are made up (demo mode; nothing zoomed in then).
 
 serve(async (req) => {
+  // Only the test deployment shows the map for now; the production app never asks.
+  if (!isTestRequest(req)) throw new HttpError(404, "De kaart is alleen in de testversie")
   const { supabase, user } = await requireUser(req)
   const parsed = salesOpportunitiesRequestSchema.safeParse(await req.json())
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? "Ongeldig verzoek")

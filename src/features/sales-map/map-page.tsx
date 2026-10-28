@@ -58,7 +58,7 @@ const MAX_KEPT = 40_000
 /** Answers for one view are dropped from the query cache this soon after the view is left. */
 const VIEW_CACHE_MS = 30_000
 
-/** The badge at the top left of the map: large enough to notice while panning. */
+/** The zoom hint at the top left of the map: large enough to notice while panning. */
 const BADGE_CLASS =
   "absolute top-3 left-3 z-10 flex items-center gap-2.5 rounded-full bg-background/95 px-4 py-2.5 text-base font-medium shadow-lg"
 
@@ -283,10 +283,16 @@ export function SalesMapPage({ onBack }: Props) {
           onDrawing={setDrawing}
         />
         {loading ? (
-          // A pulse of opacity only: the browser runs it on the compositor, without JavaScript or repainting the map.
-          <div role="status" className={cn(BADGE_CLASS, "animate-pulse motion-reduce:animate-none")}>
-            <span className="size-2.5 rounded-full bg-primary" />
-            {loading}
+          // In the middle of the map, where the eye is while zooming; taps go through to the map. A pulse of opacity
+          // only: the browser runs it on the compositor, without JavaScript or repainting the map.
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <div
+              role="status"
+              className="flex animate-pulse items-center gap-3 rounded-2xl bg-background/95 px-6 py-4 text-lg font-semibold shadow-xl motion-reduce:animate-none"
+            >
+              <span className="size-3 rounded-full bg-primary" />
+              {loading}
+            </div>
           </div>
         ) : (
           zoomHint && (
