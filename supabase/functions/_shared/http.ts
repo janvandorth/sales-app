@@ -66,23 +66,7 @@ export function serve(handler: (req: Request) => Promise<Response>) {
       }
     }
     for (const [name, value] of Object.entries(cors)) response.headers.set(name, value)
-    return compressed(req, response)
+    // Not compressed here: Supabase's gateway already gzips every answer for callers that accept it.
+    return response
   })
-}
-
-/**
- * The response gzipped when the caller accepts it: the map's answers are lists of postcodes that shrink to a tenth.
- * An answer that is already encoded, or too small to gain anything, is left as it is.
- */
-export async function compressed(req: Request, response: Response): Promise<Response> {
-  const accepts = /\bgzip\b/.test(req.headers.get("Accept-Encoding") ?? "")
-  if (!accepts || !response.body || response.headers.has("Content-Encoding")) return response
-  const body = new Uint8Array(await response.arrayBuffer())
-  const headers = new Headers(response.headers)
-  headers.append("Vary", "Accept-Encoding")
-  if (body.byteLength < 1024) return new Response(body, { status: response.status, headers })
-  const gzipped = await new Response(new Blob([body]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer()
-  headers.set("Content-Encoding", "gzip")
-  headers.delete("Content-Length")
-  return new Response(gzipped, { status: response.status, headers })
 }
