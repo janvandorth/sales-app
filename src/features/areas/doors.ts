@@ -128,9 +128,3 @@ export function firstOpen(doors: Door[], latest: Map<string, DoorVisit>): number
   const index = doors.findIndex((d) => !latest.has(doorKey(d)))
   return index === -1 ? 0 : index
 }
-
-/** The doors around `index` to show in the strip: `size` of them, the current one in the middle where possible. */
-export function stripRange(length: number, index: number, size = 7): { start: number; end: number } {
-  const start = Math.max(0, Math.min(index - Math.floor(size / 2), length - size))
-  return { start, end: Math.min(length, start + size) }
-}

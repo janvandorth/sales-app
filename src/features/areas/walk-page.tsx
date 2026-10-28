@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeftIcon, FileTextIcon, LocateFixedIcon, MapPinIcon, Undo2Icon } from "lucide-react"
+import {
+  ArrowLeftIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  FileTextIcon,
+  LocateFixedIcon,
+  MapPinIcon,
+  Undo2Icon,
+} from "lucide-react"
 import { toast } from "sonner"
 import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
@@ -24,7 +32,6 @@ import {
   OUTCOME_LABELS,
   sides,
   streetsOf,
-  stripRange,
   type Door,
   type DoorVisit,
   type Outcome,
@@ -163,7 +170,6 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
     })
   }
 
-  const { start, end } = stripRange(list.length, index)
   const loading = places.isPending || (street !== undefined && doors.isPending)
   const error = places.error ?? doors.error
 
@@ -258,29 +264,7 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
               <p className="flex-1 py-8 text-center text-muted-foreground">Geen adressen aan deze kant.</p>
             ) : (
               <>
-                <div className="flex gap-1.5">
-                  {list.slice(start, end).map((d, k) => {
-                    const visit = latest.get(doorKey(d))
-                    const current = start + k === index
-                    const earlier = visit && localDate(visit.visitedAt) !== day
-                    return (
-                      <button
-                        key={doorKey(d)}
-                        type="button"
-                        aria-label={`Nummer ${doorLabel(d)}${current ? ", huidig" : ""}${visit ? `, ${OUTCOME_LABELS[visit.outcome]}` : ""}`}
-                        onClick={() => moveTo(start + k)}
-                        className={cn(
-                          "h-11 min-w-0 flex-1 rounded-md text-sm font-semibold",
-                          OUTCOME_STYLES[visit?.outcome ?? "open"],
-                          earlier && "opacity-50",
-                          current && "ring-2 ring-foreground ring-offset-2",
-                        )}
-                      >
-                        {doorLabel(d)}
-                      </button>
-                    )
-                  })}
-                </div>
+                <DoorStrip doors={list} index={index} latest={latest} day={day} onPick={moveTo} />
 
                 <div className="flex flex-1 flex-col items-center justify-center py-4">
                   <span className="text-7xl font-bold tracking-tight">{door ? doorLabel(door) : ""}</span>
@@ -329,6 +313,77 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+type DoorStripProps = {
+  doors: Door[]
+  index: number
+  latest: Map<string, DoorVisit>
+  /** Today, so doors done on earlier days show faded. */
+  day: string
+  onPick: (index: number) => void
+}
+
+/**
+ * Every house number of the side in one row that scrolls sideways, the current one kept in the middle; the arrows
+ * jump to the start or the end of the street.
+ */
+function DoorStrip({ doors, index, latest, day, onPick }: DoorStripProps) {
+  const row = useRef<HTMLDivElement>(null)
+  const current = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    current.current?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" })
+  }, [index, doors])
+  const scrollTo = (end: "start" | "end") =>
+    row.current?.scrollTo({ left: end === "start" ? 0 : row.current.scrollWidth, behavior: "smooth" })
+
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-11 shrink-0"
+        aria-label="Naar het begin van de straat"
+        onClick={() => scrollTo("start")}
+      >
+        <ChevronsLeftIcon />
+      </Button>
+      <div ref={row} className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto p-1 [scrollbar-width:none]">
+        {doors.map((d, i) => {
+          const visit = latest.get(doorKey(d))
+          const isCurrent = i === index
+          const earlier = visit && localDate(visit.visitedAt) !== day
+          return (
+            <button
+              key={doorKey(d)}
+              ref={isCurrent ? current : undefined}
+              type="button"
+              aria-label={`Nummer ${doorLabel(d)}${isCurrent ? ", huidig" : ""}${visit ? `, ${OUTCOME_LABELS[visit.outcome]}` : ""}`}
+              aria-current={isCurrent ? "true" : undefined}
+              onClick={() => onPick(i)}
+              className={cn(
+                "h-11 min-w-12 shrink-0 rounded-md px-2 text-sm font-semibold",
+                OUTCOME_STYLES[visit?.outcome ?? "open"],
+                earlier && "opacity-50",
+                isCurrent && "ring-2 ring-foreground ring-offset-2",
+              )}
+            >
+              {doorLabel(d)}
+            </button>
+          )
+        })}
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-11 shrink-0"
+        aria-label="Naar het einde van de straat"
+        onClick={() => scrollTo("end")}
+      >
+        <ChevronsRightIcon />
+      </Button>
     </div>
   )
 }
