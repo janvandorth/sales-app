@@ -58,7 +58,9 @@ const MAX_KEPT = 40_000
 /** Answers for one view are dropped from the query cache this soon after the view is left. */
 const VIEW_CACHE_MS = 30_000
 
-/** The zoom hint at the top left of the map: large enough to notice while panning. */
+const LEVEL_NAMES: Record<Level, string> = { pc4: "PC4", pc5: "PC5", pc6: "PC6" }
+
+/** The badge at the top left of the map, for loading while panning and the zoom hint. */
 const BADGE_CLASS =
   "absolute top-3 left-3 z-10 flex items-center gap-2.5 rounded-full bg-background/95 px-4 py-2.5 text-base font-medium shadow-lg"
 
@@ -170,8 +172,13 @@ export function SalesMapPage({ onBack }: Props) {
     bbox === null ? "pc4" : level === "pc6" && current.pc6.size === 0 && detailQuery.isFetching ? "pc5" : level
   // PC4 fades to a tint only once the finer level has something to show.
   const faint = shown !== "pc4" && current[shown].size > 0
-  const loadingLevel = drawing ?? (bbox !== null && detailQuery.isFetching ? level : null)
-  const loading = loadingLevel === null ? null : loadingLevel === "pc6" ? "Straten laden…" : "Gebieden laden…"
+  const fetching = bbox !== null && detailQuery.isFetching
+  // A level switch, in or out, shows in the middle until the new level's tiles are drawn and its shades are in; the
+  // map reports the drawing, this carries it on through the answer. Panning within a level only shows top left.
+  const [switching, setSwitching] = useState<Level | null>(null)
+  if (drawing !== null && switching !== drawing) setSwitching(drawing)
+  if (drawing === null && switching !== null && !fetching) setSwitching(null)
+  const panning = switching === null && fetching ? level : null
   // Close to the next level, or zoomed in on a view too wide for it (the backend refuses those): say where to go.
   const zoomHint =
     (bbox === null && view.zoom >= ZOOM_HINT) || (bbox !== null && detailQuery.isError)
@@ -282,7 +289,7 @@ export function SalesMapPage({ onBack }: Props) {
           onView={setView}
           onDrawing={setDrawing}
         />
-        {loading ? (
+        {switching ? (
           // In the middle of the map, where the eye is while zooming; taps go through to the map. A pulse of opacity
           // only: the browser runs it on the compositor, without JavaScript or repainting the map.
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -291,8 +298,13 @@ export function SalesMapPage({ onBack }: Props) {
               className="flex animate-pulse items-center gap-3 rounded-2xl bg-background/95 px-6 py-4 text-lg font-semibold shadow-xl motion-reduce:animate-none"
             >
               <span className="size-3 rounded-full bg-primary" />
-              {loading}
+              {LEVEL_NAMES[switching]} laden…
             </div>
+          </div>
+        ) : panning ? (
+          <div role="status" className={cn(BADGE_CLASS, "animate-pulse motion-reduce:animate-none")}>
+            <span className="size-2.5 rounded-full bg-primary" />
+            {LEVEL_NAMES[panning]} laden…
           </div>
         ) : (
           zoomHint && (
