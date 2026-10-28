@@ -4,7 +4,7 @@ import * as maplibregl from "maplibre-gl"
 import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
-import { ArrowLeftIcon, RefreshCwIcon } from "lucide-react"
+import { ArrowLeftIcon, RefreshCwIcon, ZoomInIcon } from "lucide-react"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { getSalesMap, getSalesOpportunities } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
+import { cn } from "@/lib/utils"
 import type { MapArea, SalesStreet, StreetsView } from "@shared/sales-map-view"
 import type { OpportunitiesView, OpportunityArea, OpportunityStreet, WozBand } from "@shared/sales-opportunities"
 import { addDays, formatDay, today } from "../dashboard/periods"
@@ -29,8 +30,18 @@ const PERIODS = [
 /** public/nl-pc4.geojson from scripts/build-pc4-areas.mjs, with the PC4 code in `postcode`. */
 const PC4_AREAS_URL = "/nl-pc4.geojson"
 
-/** From this zoom the streets (PC6) in view are drawn instead of the PC4 areas. */
+/** From this zoom the streets (PC6) in view are drawn over the PC4 areas. */
 const STREET_ZOOM = 14
+
+/** From this zoom on the way in, a hint says the streets come when zooming in further. */
+const ZOOM_HINT = 11
+
+/** How strongly the PC4 areas still show under the streets. */
+const FAINT = 0.2
+
+/** The badge at the top left of the map: large enough to notice while panning. */
+const BADGE_CLASS =
+  "absolute top-3 left-3 z-10 flex items-center gap-2.5 rounded-full bg-background/95 px-4 py-2.5 text-base font-medium shadow-lg"
 
 const EMPTY: StreetsView<never>["features"] = { type: "FeatureCollection", features: [] }
 
@@ -51,8 +62,9 @@ export function SalesMapPage({ onBack }: Props) {
   const [mode, setMode] = useState<Mode>("sales")
   const [periodDays, setPeriodDays] = useState<number>(90)
   const [woz, setWoz] = useState<WozBand>("low")
-  /** The view's box when zoomed in to streets, else null. */
-  const [bbox, setBbox] = useState<string | null>(null)
+  /** The map's zoom, and its box once zoomed in to streets (else null). */
+  const [view, setView] = useState<MapView>({ zoom: 7, bbox: null })
+  const bbox = view.bbox
   const until = today()
   const from = addDays(until, -(periodDays - 1))
 
@@ -104,7 +116,10 @@ export function SalesMapPage({ onBack }: Props) {
   const streets: StreetsView<SalesStreet | OpportunityStreet> | undefined =
     bbox === null ? undefined : mode === "sales" ? salesStreets.data : kansenStreets.data
   // The first look at a spot waits for PDOK's outlines, a few seconds: say so, or the map seems stuck.
-  const streetsLoading = bbox !== null && (mode === "sales" ? salesStreets.isFetching : kansenStreets.isFetching)
+  const streetsQuery = mode === "sales" ? salesStreets : kansenStreets
+  const streetsLoading = bbox !== null && streetsQuery.isFetching
+  // Close to street level, or zoomed in on a view too wide for it (the backend refuses those): say where to go.
+  const zoomHint = (view.zoom >= ZOOM_HINT && bbox === null) || (bbox !== null && streetsQuery.isError)
 
   const salesAreas = useMemo(() => new Map(salesMap?.areas.map((a) => [a.postcode, a]) ?? []), [salesMap])
   const kansenAreas = useMemo(() => new Map(opportunities?.areas.map((a) => [a.postcode, a]) ?? []), [opportunities])
@@ -196,15 +211,19 @@ export function SalesMapPage({ onBack }: Props) {
       )}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <SalesMap mode={mode} shades={shades} streets={streets} popup={popup} onStreetView={setBbox} />
-        {streetsLoading && (
-          <div
-            role="status"
-            className="absolute top-3 left-3 z-10 flex items-center gap-2.5 rounded-full bg-background/95 px-4 py-2.5 text-base font-medium shadow-lg"
-          >
+        <SalesMap mode={mode} shades={shades} streets={streets} popup={popup} onView={setView} />
+        {streetsLoading ? (
+          <div role="status" className={BADGE_CLASS}>
             <Spinner className="size-5" />
             Straten laden…
           </div>
+        ) : (
+          zoomHint && (
+            <div className={cn(BADGE_CLASS, "text-muted-foreground")}>
+              <ZoomInIcon className="size-5" />
+              Zoom verder in voor de straten
+            </div>
+          )
         )}
       </div>
 
@@ -233,22 +252,27 @@ type MapProps = {
   shades: Map<string, Shade>
   streets: StreetsView<unknown> | undefined
   popup: { current: PopupFor }
-  /** Called with the view's box once zoomed in to streets, and with null when zoomed out again. */
-  onStreetView: (bbox: string | null) => void
+  /** Called a moment after the map stops moving. */
+  onView: (view: MapView) => void
 }
 
+/** The map's zoom, and its box ("minLon,minLat,maxLon,maxLat") from STREET_ZOOM on, else null. */
+type MapView = { zoom: number; bbox: string | null }
+
 /**
- * The MapLibre map. PC4 shades are set as feature state, so new numbers never reload the areas; from STREET_ZOOM the
- * areas fade out and the backend's street outlines for the view take over.
+ * The MapLibre map. PC4 shades are set as feature state, so new numbers never reload the areas; once the backend's
+ * street outlines for a zoomed-in view have arrived, they take over and the areas stay only as a faint tint, so the
+ * map is never empty while the streets load.
  */
-function SalesMap({ mode, shades, streets, popup, onStreetView }: MapProps) {
+function SalesMap({ mode, shades, streets, popup, onView }: MapProps) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
-  const viewChanged = useRef(onStreetView)
+  const viewChanged = useRef(onView)
   const [loaded, setLoaded] = useState(false)
   useEffect(() => {
-    viewChanged.current = onStreetView
-  }, [onStreetView])
+    viewChanged.current = onView
+  }, [onView])
+  const streetsShown = streets !== undefined
 
   useEffect(() => {
     if (!container.current) return
@@ -283,19 +307,19 @@ function SalesMap({ mode, shades, streets, popup, onStreetView }: MapProps) {
         },
         layers: [
           { id: "background", type: "raster", source: "background" },
-          { id: "pc4-fill", type: "fill", source: "pc4", paint: pc4Paint("sales", shaded) },
+          { id: "pc4-fill", type: "fill", source: "pc4", paint: pc4Paint("sales", shaded, false) },
           {
             id: "pc4-line",
             type: "line",
             source: "pc4",
             paint: { "line-color": "#334155", "line-width": 0.5, "line-opacity": ["case", shaded, 0.6, 0.15] },
           },
-          { id: "pc6-fill", type: "fill", source: "pc6", minzoom: STREET_ZOOM - 0.5, paint: pc6Paint("sales") },
+          { id: "pc6-fill", type: "fill", source: "pc6", minzoom: STREET_ZOOM, paint: pc6Paint("sales") },
           {
             id: "pc6-line",
             type: "line",
             source: "pc6",
-            minzoom: STREET_ZOOM - 0.5,
+            minzoom: STREET_ZOOM,
             paint: { "line-color": "#334155", "line-width": 0.4, "line-opacity": 0.5 },
           },
         ],
@@ -304,14 +328,16 @@ function SalesMap({ mode, shades, streets, popup, onStreetView }: MapProps) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
     map.on("load", () => setLoaded(true))
 
-    // Zoomed in, tell the page which streets to ask for; a moment after the map stops, not on every frame.
+    // Tell the page the zoom and, zoomed in, which streets to ask for; a moment after the map stops, not every frame.
     let wait: ReturnType<typeof setTimeout> | undefined
     map.on("moveend", () => {
       clearTimeout(wait)
       wait = setTimeout(() => {
-        if (map.getZoom() < STREET_ZOOM) return viewChanged.current(null)
+        const zoom = map.getZoom()
+        if (zoom < STREET_ZOOM) return viewChanged.current({ zoom, bbox: null })
         const b = map.getBounds()
-        viewChanged.current([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(3)).join(","))
+        const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(3)).join(",")
+        viewChanged.current({ zoom, bbox })
       }, 400)
     })
 
@@ -345,7 +371,7 @@ function SalesMap({ mode, shades, streets, popup, onStreetView }: MapProps) {
     const map = mapRef.current
     if (!map || !loaded) return
     const shaded: ExpressionSpecification = ["boolean", ["feature-state", "shaded"], false]
-    const pc4 = pc4Paint(mode, shaded)
+    const pc4 = pc4Paint(mode, shaded, streetsShown)
     const pc6 = pc6Paint(mode)
     map.setPaintProperty("pc4-fill", "fill-color", pc4["fill-color"])
     map.setPaintProperty("pc4-fill", "fill-opacity", pc4["fill-opacity"])
@@ -355,7 +381,7 @@ function SalesMap({ mode, shades, streets, popup, onStreetView }: MapProps) {
     for (const [postcode, shade] of shades) {
       map.setFeatureState({ source: "pc4", id: postcode }, { shaded: true, level: shade.level, age: shade.age ?? 1 })
     }
-  }, [mode, shades, loaded])
+  }, [mode, shades, loaded, streetsShown])
 
   // The streets of the view, or none when zoomed out.
   useEffect(() => {
@@ -370,13 +396,13 @@ function SalesMap({ mode, shades, streets, popup, onStreetView }: MapProps) {
 
 type FillPaint = { "fill-color": ExpressionSpecification; "fill-opacity": ExpressionSpecification }
 
-/** PC4 areas by feature state, fading out where the streets take over. */
-function pc4Paint(mode: Mode, shaded: ExpressionSpecification): FillPaint {
+/** PC4 areas by feature state; only a faint tint once the streets of the view are drawn over them. */
+function pc4Paint(mode: Mode, shaded: ExpressionSpecification, faint: boolean): FillPaint {
   const level: ExpressionSpecification = ["feature-state", "level"]
-  const opacity: ExpressionSpecification = ["case", shaded, fillOpacity(mode, level), 0]
+  const opacity = faint ? (["*", FAINT, fillOpacity(mode, level)] as ExpressionSpecification) : fillOpacity(mode, level)
   return {
     "fill-color": fillColor(mode, level, ["feature-state", "age"]),
-    "fill-opacity": ["interpolate", ["linear"], ["zoom"], STREET_ZOOM - 0.5, opacity, STREET_ZOOM, 0],
+    "fill-opacity": ["case", shaded, opacity, 0],
   }
 }
 
