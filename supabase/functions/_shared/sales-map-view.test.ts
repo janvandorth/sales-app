@@ -95,24 +95,20 @@ describe("salesMapView for a recruiter", () => {
 describe("salesStreetsView", () => {
   const pc6: SalesPc6 = {
     streetThresholds: [2, 3, 4, 4],
-    streets: [{ ...area("3812AA", 4, "2026-10-05", [["1210AP", 4]]), geometry: { type: "Polygon", coordinates: [] } }],
+    streets: [area("3812AA", 4, "2026-10-05", [["1210AP", 4]])],
   }
 
-  it("gives each street its own shade and age as a GeoJSON feature, on the scale of its area", () => {
+  it("gives each street its own shade and age on the national street scale", () => {
     const view = salesStreetsView(pc6, true, FROM, TO)
 
     expect(view.level).toBe("pc6")
-    expect(view.features.features[0]).toEqual({
-      type: "Feature",
-      properties: { postcode: "3812AA", level: 3, age: 22 / 90 },
-      geometry: { type: "Polygon", coordinates: [] },
-    })
-    expect(view.streets[0]).toMatchObject({ sold: 4, recruiters: [{ recruiter: "1210AP", sold: 4 }] })
+    expect(view.areas[0]).toMatchObject({ postcode: "3812AA", level: 3, age: 22 / 90, sold: 4 })
+    expect(view.areas[0].recruiters).toEqual([{ recruiter: "1210AP", sold: 4 }])
   })
 
-  it("gives a recruiter the street and its newest sale, no count", () => {
-    expect(salesStreetsView(pc6, false, FROM, TO).streets).toEqual([
-      { postcode: "3812AA", city: "Amersfoort", lastSoldOn: "2026-10-05" },
+  it("gives a recruiter the street, its shade and its newest sale, no count", () => {
+    expect(salesStreetsView(pc6, false, FROM, TO).areas).toEqual([
+      { postcode: "3812AA", level: 3, age: 22 / 90, city: "Amersfoort", lastSoldOn: "2026-10-05" },
     ])
   })
 })
@@ -125,7 +121,6 @@ describe("salesPc5View", () => {
         ...area("3812A", 6, "2026-10-05", [["1210AP", 6]]),
         postcode: "3812A",
         bestStreetSold: 4,
-        geometry: { type: "Polygon", coordinates: [] },
       },
     ],
   }
@@ -138,13 +133,12 @@ describe("salesPc5View", () => {
     const view = salesPc5View(pc5, true, FROM, TO)
 
     expect(view.level).toBe("pc5")
-    expect(view.features.features[0].properties).toEqual({ postcode: "3812A", level: 4, age: 22 / 90 })
-    expect(view.streets[0]).toMatchObject({ sold: 6, bestStreetSold: 4 })
+    expect(view.areas[0]).toMatchObject({ postcode: "3812A", level: 4, age: 22 / 90, sold: 6, bestStreetSold: 4 })
   })
 
-  it("gives a recruiter the area and its newest sale, no count", () => {
-    expect(salesPc5View(pc5, false, FROM, TO).streets).toEqual([
-      { postcode: "3812A", city: "Amersfoort", lastSoldOn: "2026-10-05" },
+  it("gives a recruiter the area, its shade and its newest sale, no count", () => {
+    expect(salesPc5View(pc5, false, FROM, TO).areas).toEqual([
+      { postcode: "3812A", level: 4, age: 22 / 90, city: "Amersfoort", lastSoldOn: "2026-10-05" },
     ])
   })
 })

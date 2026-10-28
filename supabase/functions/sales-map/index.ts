@@ -8,10 +8,11 @@ import { demoSalesMap } from "../_shared/sales-map-demo.ts"
 import { salesMapView, salesPc5View, salesStreetsView, type SalesMapResponse } from "../_shared/sales-map-view.ts"
 
 // Where the team sold, for the map, from ZMAdmin via the Contracts API: per PC4 (GET .../Sales/2026.1/Map), or
-// zoomed in the PC5 areas (.../Map/Pc5) or the streets (.../Map/Pc6) in the map's view. Everyone sees the whole team's areas, when the newest sale
+// zoomed in the PC5 areas (.../Map/Pc5) or the streets (.../Map/Pc6) in the map's view. Only what the areas are
+// coloured by: their outlines are vector tiles the app reads from Storage. Everyone sees the whole team's areas, when the newest sale
 // there was and a shade for how much; only admins also get how many sales and by whom. The counts are left out
 // here, not in the app, so a recruiter's phone never receives them.
-// Without STATS_API_KEY the areas are made up (demo mode; no PC5 or street outlines then).
+// Without STATS_API_KEY the areas are made up (demo mode; nothing zoomed in then).
 
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
@@ -30,12 +31,12 @@ serve(async (req) => {
     const pc5 = key
       ? await fetchFromApi(`${mapUrl()}/Pc5`, key, { from, to, bbox }, salesPc5Schema)
       : { areaThresholds: [], areas: [] }
-    response = { demo: !key, streets: salesPc5View(pc5, detailed, from, to) }
+    response = { demo: !key, detail: salesPc5View(pc5, detailed, from, to) }
   } else if (bbox) {
     const pc6 = key
       ? await fetchFromApi(`${mapUrl()}/Pc6`, key, { from, to, bbox }, salesPc6Schema)
       : { streetThresholds: [], streets: [] }
-    response = { demo: !key, streets: salesStreetsView(pc6, detailed, from, to) }
+    response = { demo: !key, detail: salesStreetsView(pc6, detailed, from, to) }
   } else {
     const map = key ? await fetchFromApi(mapUrl(), key, { from, to }, salesMapSchema) : demoSalesMap(from, to)
     response = { demo: !key, map: salesMapView(map, detailed, from, to) }

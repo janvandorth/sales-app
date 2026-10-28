@@ -124,12 +124,12 @@ export async function getSalesMap(request: SalesMapRequest): Promise<SalesMapRes
     const { salesMapView, salesPc5View, salesStreetsView } = await import("@shared/sales-map-view")
     const detailed = DEMO_MODE === "admin"
     await new Promise((resolve) => setTimeout(resolve, 400))
-    // The demo has no PC5 or street outlines: zoomed in, the areas simply fade out.
+    // The demo has nothing zoomed in: there, only the outlines show.
     if (request.bbox && request.level === "pc5") {
-      return { demo: true, streets: salesPc5View({ areaThresholds: [], areas: [] }, detailed, "", "") }
+      return { demo: true, detail: salesPc5View({ areaThresholds: [], areas: [] }, detailed, "", "") }
     }
     if (request.bbox) {
-      return { demo: true, streets: salesStreetsView({ streetThresholds: [], streets: [] }, detailed, "", "") }
+      return { demo: true, detail: salesStreetsView({ streetThresholds: [], streets: [] }, detailed, "", "") }
     }
     const map = demoSalesMap(request.from, request.to)
     return { demo: true, map: salesMapView(map, detailed, request.from, request.to) }

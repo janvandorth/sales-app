@@ -27,8 +27,7 @@ export type MapArea = {
 }
 
 /** The sales-map function's answer: the PC4 areas, or (asked with a view) the PC5 areas or streets in it. */
-export type SalesMapResponse =
-  { demo: boolean; map: SalesMapView } | { demo: boolean; streets: StreetsView<SalesStreet> }
+export type SalesMapResponse = { demo: boolean; map: SalesMapView } | { demo: boolean; detail: DetailView<SalesStreet> }
 
 export type SalesMapView = {
   /** True when the counts are included (admins). */
@@ -40,9 +39,13 @@ export type SalesMapView = {
   recruiters: { number: string; name: string }[]
 }
 
-/** One PC5 area or street (PC6) of the zoomed-in map. The numbers only for admins. */
+/** One PC5 area or street (PC6) of the zoomed-in map and what it is drawn by. The numbers only for admins. */
 export type SalesStreet = {
   postcode: string
+  /** 1 to LEVELS, on the national scale of its kind (PC5 by its busiest street, a street by itself). */
+  level: number
+  /** As MapArea.age. */
+  age: number
   city: string
   lastSoldOn: string
   sold?: number
@@ -52,18 +55,14 @@ export type SalesStreet = {
 }
 
 /**
- * The PC5 areas or streets in a view: outlines with what they are drawn by (level, and on the sales map the age) as
- * GeoJSON for the map, and per postcode what its popup shows.
+ * The PC5 areas or streets in a view: per postcode what it is drawn by and what its popup shows. The outlines are
+ * vector tiles the app has; this is only what colours them.
  */
-export type StreetsView<T> = {
+export type DetailView<T> = {
   detailed: boolean
   /** Which postcodes these are. */
   level: "pc5" | "pc6"
-  features: {
-    type: "FeatureCollection"
-    features: { type: "Feature"; properties: { postcode: string; level: number; age?: number }; geometry: unknown }[]
-  }
-  streets: T[]
+  areas: T[]
 }
 
 type Sum = {
@@ -125,48 +124,33 @@ export function salesMapView(map: SalesMap, detailed: boolean, from: string, to:
 }
 
 /** The streets in a view, each by its own sales on the national street scale. */
-export function salesStreetsView(pc6: SalesPc6, detailed: boolean, from: string, to: string): StreetsView<SalesStreet> {
+export function salesStreetsView(pc6: SalesPc6, detailed: boolean, from: string, to: string): DetailView<SalesStreet> {
   return {
     detailed,
     level: "pc6",
-    features: {
-      type: "FeatureCollection",
-      features: pc6.streets.map((s) => ({
-        type: "Feature",
-        properties: {
-          postcode: s.postcode,
-          level: levelFrom(s.sold, pc6.streetThresholds),
-          age: ageIn(s.lastSoldOn, from, to),
-        },
-        geometry: s.geometry,
-      })),
-    },
-    streets: pc6.streets.map(({ postcode, city, lastSoldOn, sold, recruiters }) =>
-      detailed ? { postcode, city, lastSoldOn, sold, recruiters } : { postcode, city, lastSoldOn },
-    ),
+    areas: pc6.streets.map(({ postcode, city, lastSoldOn, sold, recruiters }) => {
+      const shown = {
+        postcode,
+        level: levelFrom(sold, pc6.streetThresholds),
+        age: ageIn(lastSoldOn, from, to),
+        city,
+        lastSoldOn,
+      }
+      return detailed ? { ...shown, sold, recruiters } : shown
+    }),
   }
 }
 
 /** The PC5 areas in a view, each by its busiest street ranked against all PC5 areas in the country. */
-export function salesPc5View(pc5: SalesPc5, detailed: boolean, from: string, to: string): StreetsView<SalesStreet> {
+export function salesPc5View(pc5: SalesPc5, detailed: boolean, from: string, to: string): DetailView<SalesStreet> {
   return {
     detailed,
     level: "pc5",
-    features: {
-      type: "FeatureCollection",
-      features: pc5.areas.map((a) => ({
-        type: "Feature",
-        properties: {
-          postcode: a.postcode,
-          level: levelFrom(a.bestStreetSold, pc5.areaThresholds),
-          age: ageIn(a.lastSoldOn, from, to),
-        },
-        geometry: a.geometry,
-      })),
-    },
-    streets: pc5.areas.map(({ postcode, city, lastSoldOn, sold, bestStreetSold, recruiters }) =>
-      detailed ? { postcode, city, lastSoldOn, sold, bestStreetSold, recruiters } : { postcode, city, lastSoldOn },
-    ),
+    areas: pc5.areas.map(({ postcode, city, lastSoldOn, sold, bestStreetSold, recruiters }) => {
+      const level = levelFrom(bestStreetSold, pc5.areaThresholds)
+      const shown = { postcode, level, age: ageIn(lastSoldOn, from, to), city, lastSoldOn }
+      return detailed ? { ...shown, sold, bestStreetSold, recruiters } : shown
+    }),
   }
 }
 

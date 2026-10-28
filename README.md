@@ -140,9 +140,24 @@ streets around it. The map shades PC4 areas in blue by open households; tapping 
 households and WOZ per area and per street; recruiters see only the shades and the ranked streets. All numbers are
 computed in the backend; the app only draws what it receives.
 
-The areas are `public/nl-pc4.geojson` (about 2 MB, 400 kB gzipped), built from CBS postcode statistics on PDOK with
-`node scripts/build-pc4-areas.mjs <year>` when CBS publishes a new year. The map credits CBS and Esri Nederland for
-the areas and PDOK for the background, as their licences require.
+**Zooming in.** From zoom 11 the map shows PC5 areas, from zoom 14 the streets (PC6), each asked for per view
+(`…/Map/Pc5`, `…/Map/Pc6`, `…/Opportunities/Pc5`, `…/Opportunities/Pc6` with `bbox`). A PC5 is ranked by its
+best street like a PC4; a street by itself on the national street scale. The answers hold only postcodes and what
+they are coloured by (and the numbers for admins); shades seen while zoomed in are kept while panning, up to 20,000
+per level, and let go when zooming out to PC4 or changing the filter.
+
+**Outlines.** All areas are vector tiles: `pc4.pmtiles` (zoom 5–10, 1.5 MB), `pc5.pmtiles` (zoom 11, 4 MB) and
+`pc6.pmtiles` (zoom 14, 37 MB), of which the map reads only the tiles in view. They hold just the postcode and are
+built once a year from the CBS GeoPackages (cbs.nl > Gegevens per postcode > Downloads) and PC4 from PDOK:
+
+```sh
+node scripts/build-postcode-tiles.mjs cbs_pc5_2025_v1.gpkg cbs_pc6_2025_v1.gpkg 2024 public/tiles
+```
+
+Upload the three files to the public Supabase Storage bucket `postcode-tiles` under `2025/` (a new folder per CBS
+year, so browsers never mix years), or point `VITE_POSTCODE_TILES_URL` elsewhere; in development `public/tiles`
+(git-ignored) with `VITE_POSTCODE_TILES_URL=/tiles`. The map credits CBS and Esri Nederland for the areas and PDOK
+for the background, as their licences require.
 
 **Login.** Sign-ups are disabled. An admin adds a recruiter on the admin page ("Werver toevoegen"): the account is
 active at once with the password `tijdelijkwachtwoord` (`TEMPORARY_PASSWORD` in `_shared/admin-types.ts`), which

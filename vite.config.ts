@@ -30,6 +30,16 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // The map (MapLibre, about 430 kB gzipped) is not installed with the app: it is cached the first time someone
+        // opens the map, so recruiters who never do never download it.
+        globIgnores: ["**/map-page-*", "**/maplibre-gl-worker-*"],
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/(map-page|maplibre-gl-worker)-[^/]+\.(js|css)$/,
+            handler: "CacheFirst",
+            options: { cacheName: "map-code", expiration: { maxEntries: 8 } },
+          },
+        ],
       },
     }),
   ],

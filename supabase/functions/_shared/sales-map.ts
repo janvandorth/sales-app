@@ -39,22 +39,16 @@ export const salesMapSchema = z.object({
   streetThresholds: z.array(z.number().int()),
 })
 
-/** The Contracts API's streets in a view, with their outline. */
+/** The Contracts API's streets in a view with a sale. Their outlines are vector tiles in the app. */
 export const salesPc6Schema = z.object({
   streetThresholds: z.array(z.number().int()),
-  streets: z.array(salesArea.extend({ geometry: z.record(z.string(), z.unknown()) })),
+  streets: z.array(salesArea),
 })
 
-/** The Contracts API's PC5 areas in a view, with their outline and national thresholds by best street. */
+/** The Contracts API's PC5 areas in a view with a sale, and the national thresholds by best street. */
 export const salesPc5Schema = z.object({
   areaThresholds: z.array(z.number().int()),
-  areas: z.array(
-    salesArea.extend({
-      postcode: z.string().regex(/^\d{4}[A-Z]$/),
-      bestStreetSold: z.number().int(),
-      geometry: z.record(z.string(), z.unknown()),
-    }),
-  ),
+  areas: z.array(salesArea.extend({ postcode: z.string().regex(/^\d{4}[A-Z]$/), bestStreetSold: z.number().int() })),
 })
 
 export type SalesMap = z.infer<typeof salesMapSchema>

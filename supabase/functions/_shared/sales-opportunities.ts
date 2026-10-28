@@ -6,7 +6,7 @@
 // numbers only admins. No Deno APIs here.
 import { z } from "zod"
 import { bboxSchema } from "./sales-map.ts"
-import { levelFrom, streetThresholds, type StreetsView } from "./sales-map-view.ts"
+import { levelFrom, streetThresholds, type DetailView } from "./sales-map-view.ts"
 
 export const WOZ_BANDS = ["low", "mid", "high", "all"] as const
 export type WozBand = (typeof WOZ_BANDS)[number]
@@ -52,13 +52,13 @@ const street = z.object({
 /** The Contracts API's streets of one PC4, most open households first. */
 export const opportunityStreetsSchema = z.object({ postcode: z.string(), streets: z.array(street) })
 
-/** The Contracts API's streets in a view, with their outline. */
+/** The Contracts API's streets in a view with open households. Their outlines are vector tiles in the app. */
 export const opportunityPc6Schema = z.object({
   streetThresholds: z.array(z.number().int()),
-  streets: z.array(street.extend({ geometry: z.record(z.string(), z.unknown()) })),
+  streets: z.array(street.omit({ streets: true, city: true })),
 })
 
-/** The Contracts API's PC5 areas in a view, with their outline and national thresholds by best street. */
+/** The Contracts API's PC5 areas in a view with open households, and the national thresholds by best street. */
 export const opportunityPc5Schema = z.object({
   areaThresholds: z.array(z.number().int()),
   areas: z.array(
@@ -68,7 +68,6 @@ export const opportunityPc5Schema = z.object({
       customers: z.number().int(),
       open: z.number().int(),
       bestStreetOpen: z.number().int(),
-      geometry: z.record(z.string(), z.unknown()),
     }),
   ),
 })
@@ -110,8 +109,20 @@ export type OpportunityStreet = {
   households?: number
   customers?: number
   open?: number
+  woz?: number | null
+}
+
+/** One PC5 area or street of the zoomed-in map and its shade. The numbers only for admins. */
+export type OpportunityDetail = {
+  postcode: string
+  /** 1 to LEVELS, on the national scale of its kind (PC5 by its best street, a street by itself). */
+  level: number
+  households?: number
+  customers?: number
+  open?: number
   /** PC5 only: open households in its best street. */
   bestStreetOpen?: number
+  /** Streets only: average WOZ value in thousands. */
   woz?: number | null
 }
 
@@ -121,7 +132,7 @@ export type OpportunityStreetsView = { detailed: boolean; postcode: string; stre
 export type SalesOpportunitiesResponse =
   | { demo: boolean; action: "areas"; view: OpportunitiesView }
   | { demo: boolean; action: "streets"; view: OpportunityStreetsView }
-  | { demo: boolean; action: "pc5" | "pc6"; view: StreetsView<OpportunityStreet> }
+  | { demo: boolean; action: "pc5" | "pc6"; view: DetailView<OpportunityDetail> }
 
 /** Each area by its best street. An area without open households in the band is left out: nothing to win there. */
 export function opportunitiesView(api: OpportunityAreas, detailed: boolean): OpportunitiesView {
@@ -152,39 +163,25 @@ export function opportunityStreetsView(api: OpportunityStreets, detailed: boolea
 }
 
 /** The streets in a view, each by its own open households on the national street scale. */
-export function opportunityPc6View(api: OpportunityPc6, detailed: boolean): StreetsView<OpportunityStreet> {
+export function opportunityPc6View(api: OpportunityPc6, detailed: boolean): DetailView<OpportunityDetail> {
   return {
     detailed,
     level: "pc6",
-    features: {
-      type: "FeatureCollection",
-      features: api.streets.map((s) => ({
-        type: "Feature",
-        properties: { postcode: s.postcode, level: levelFrom(s.open, api.streetThresholds) },
-        geometry: s.geometry,
-      })),
-    },
-    streets: api.streets.map(({ postcode, households, customers, open, woz }) =>
-      detailed ? { postcode, households, customers, open, woz } : { postcode },
-    ),
+    areas: api.streets.map(({ postcode, households, customers, open, woz }) => {
+      const level = levelFrom(open, api.streetThresholds)
+      return detailed ? { postcode, level, households, customers, open, woz } : { postcode, level }
+    }),
   }
 }
 
 /** The PC5 areas in a view, each by its best street ranked against all PC5 areas in the country. */
-export function opportunityPc5View(api: OpportunityPc5, detailed: boolean): StreetsView<OpportunityStreet> {
+export function opportunityPc5View(api: OpportunityPc5, detailed: boolean): DetailView<OpportunityDetail> {
   return {
     detailed,
     level: "pc5",
-    features: {
-      type: "FeatureCollection",
-      features: api.areas.map((a) => ({
-        type: "Feature",
-        properties: { postcode: a.postcode, level: levelFrom(a.bestStreetOpen, api.areaThresholds) },
-        geometry: a.geometry,
-      })),
-    },
-    streets: api.areas.map(({ postcode, households, customers, open, bestStreetOpen }) =>
-      detailed ? { postcode, households, customers, open, bestStreetOpen } : { postcode },
-    ),
+    areas: api.areas.map(({ postcode, households, customers, open, bestStreetOpen }) => {
+      const level = levelFrom(bestStreetOpen, api.areaThresholds)
+      return detailed ? { postcode, level, households, customers, open, bestStreetOpen } : { postcode, level }
+    }),
   }
 }

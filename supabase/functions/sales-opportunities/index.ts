@@ -18,9 +18,9 @@ import {
 } from "../_shared/sales-opportunities.ts"
 
 // Where households are still "for grabs" for the map, from the Contracts API: per PC4, the ranked streets of one,
-// or (zoomed in) the PC5 areas or the streets in the map's view. Everyone sees the shades and the streets; only admins get
+// or (zoomed in) the PC5 areas or the streets in the map's view, as shades for the vector-tile outlines in the app. Everyone sees the shades and the streets; only admins get
 // households, customers and open households. The numbers are left out here, not in the app, so a recruiter's phone
-// never receives them. Without STATS_API_KEY the answers are made up (demo mode; no PC5 or street outlines then).
+// never receives them. Without STATS_API_KEY the answers are made up (demo mode; nothing zoomed in then).
 
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)

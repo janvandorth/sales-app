@@ -76,15 +76,22 @@ describe("opportunityStreetsView", () => {
 describe("opportunityPc6View", () => {
   const pc6: OpportunityPc6 = {
     streetThresholds: [10, 20, 40, 80],
-    streets: [{ ...streets.streets[0], open: 90, geometry: { type: "Polygon", coordinates: [] } }],
+    streets: [{ postcode: "3811AA", households: 100, customers: 10, open: 90, woz: 250 }],
   }
 
-  it("shades each street on the same scale as the areas", () => {
-    expect(opportunityPc6View(pc6, true).features.features[0].properties).toEqual({ postcode: "3811AA", level: LEVELS })
+  it("shades each street on the national street scale", () => {
+    expect(opportunityPc6View(pc6, true).areas[0]).toEqual({
+      postcode: "3811AA",
+      level: LEVELS,
+      households: 100,
+      customers: 10,
+      open: 90,
+      woz: 250,
+    })
   })
 
-  it("gives a recruiter only the postcode of each street", () => {
-    expect(opportunityPc6View(pc6, false).streets).toEqual([{ postcode: "3811AA" }])
+  it("gives a recruiter only the postcode and shade of each street", () => {
+    expect(opportunityPc6View(pc6, false).areas).toEqual([{ postcode: "3811AA", level: LEVELS }])
   })
 })
 
@@ -98,7 +105,6 @@ describe("opportunityPc5View", () => {
         customers: 10,
         open: 290,
         bestStreetOpen: 30,
-        geometry: { type: "Polygon", coordinates: [] },
       },
     ],
   }
@@ -111,9 +117,9 @@ describe("opportunityPc5View", () => {
     const view = opportunityPc5View(pc5, true)
 
     expect(view.level).toBe("pc5")
-    expect(view.features.features[0].properties).toEqual({ postcode: "3811A", level: 3 })
-    expect(view.streets[0]).toEqual({
+    expect(view.areas[0]).toEqual({
       postcode: "3811A",
+      level: 3,
       households: 300,
       customers: 10,
       open: 290,
@@ -121,7 +127,7 @@ describe("opportunityPc5View", () => {
     })
   })
 
-  it("gives a recruiter only the postcode of each area", () => {
-    expect(opportunityPc5View(pc5, false).streets).toEqual([{ postcode: "3811A" }])
+  it("gives a recruiter only the postcode and shade of each area", () => {
+    expect(opportunityPc5View(pc5, false).areas).toEqual([{ postcode: "3811A", level: 3 }])
   })
 })
