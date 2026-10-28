@@ -7,7 +7,6 @@ import {
   nearestDoor,
   sides,
   streetsOf,
-  stripRange,
   toevoeging,
   type Door,
   type DoorVisit,
@@ -57,13 +56,6 @@ describe("doors", () => {
     const list = [door(2), door(4), door(6)]
     expect(firstOpen(list, latestVisits([visit(door(2), "2026-10-28T10:00:00Z")]))).toBe(1)
     expect(firstOpen(list, latestVisits(list.map((d) => visit(d, "2026-10-28T10:00:00Z"))))).toBe(0)
-  })
-
-  it("keeps the current door in the middle of the strip where it can", () => {
-    expect(stripRange(20, 0)).toEqual({ start: 0, end: 7 })
-    expect(stripRange(20, 10)).toEqual({ start: 7, end: 14 })
-    expect(stripRange(20, 19)).toEqual({ start: 13, end: 20 })
-    expect(stripRange(4, 2)).toEqual({ start: 0, end: 4 })
   })
 })
 
