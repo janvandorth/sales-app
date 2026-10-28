@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { LEVELS } from "@shared/sales-map-view"
 import { age, STRENGTH_RANGE, strength } from "./scale"
 
 describe("age", () => {
@@ -16,16 +17,12 @@ describe("age", () => {
 describe("strength", () => {
   const [low, high] = STRENGTH_RANGE
 
-  it("runs from the lightest for one sale to the darkest for the busiest area", () => {
-    expect(strength(1, 40)).toBe(low)
-    expect(strength(40, 40)).toBeCloseTo(high, 5)
+  it("runs from the lightest for level 1 to the darkest for the top level", () => {
+    expect(strength(1)).toBe(low)
+    expect(strength(LEVELS)).toBeCloseTo(high, 5)
   })
 
-  it("grows on a log scale, so half the busiest is well past halfway", () => {
-    expect(strength(20, 40)).toBeGreaterThan((low + high) / 2)
-  })
-
-  it("draws a single sale at full strength when no area has more", () => {
-    expect(strength(1, 1)).toBe(high)
+  it("spreads the levels in even steps", () => {
+    expect(strength(3)).toBeCloseTo((low + high) / 2, 5)
   })
 })

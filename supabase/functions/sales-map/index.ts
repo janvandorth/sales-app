@@ -2,24 +2,28 @@ import { requireUser } from "../_shared/auth.ts"
 import { mapUrl } from "../_shared/contracts-api.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
-import { salesMapRequestSchema, salesMapSchema, type SalesMap, type SalesMapResponse } from "../_shared/sales-map.ts"
+import { salesMapRequestSchema, salesMapSchema, type SalesMap } from "../_shared/sales-map.ts"
 import { demoSalesMap } from "../_shared/sales-map-demo.ts"
+import { salesMapView, type SalesMapResponse } from "../_shared/sales-map-view.ts"
 
-// Sales per postcode for the map, from ZMAdmin via the Contracts API (GET .../Sales/2026.1/Map). Every signed-in
-// user sees the whole team's sales there, so unlike kpi there is no wervernr to enforce.
+// Where the team sold, per PC4, for the map, from ZMAdmin via the Contracts API (GET .../Sales/2026.1/Map).
+// Everyone sees the whole team's areas and when the newest sale there was; only admins also get how many sales
+// and by whom. The counts are left out here, not in the app, so a recruiter's phone never receives them.
 // Without STATS_API_KEY the areas are made up (demo mode).
 
 serve(async (req) => {
-  await requireUser(req)
+  const { supabase, user } = await requireUser(req)
   const parsed = salesMapRequestSchema.safeParse(await req.json())
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? "Ongeldig verzoek")
   const { from, to } = parsed.data
   if (from > to) throw new HttpError(400, "Ongeldige periode")
 
+  const { data: profile, error } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
+  if (error || !profile) throw new HttpError(403, "Geen profiel gevonden")
+
   const key = optionalEnv("STATS_API_KEY")
-  const response: SalesMapResponse = key
-    ? { demo: false, map: await fetchMap(mapUrl(), key, from, to) }
-    : { demo: true, map: demoSalesMap(from, to) }
+  const map = key ? await fetchMap(mapUrl(), key, from, to) : demoSalesMap(from, to)
+  const response: SalesMapResponse = { demo: !key, map: salesMapView(map, profile.is_admin === true) }
   return json(response)
 })
 

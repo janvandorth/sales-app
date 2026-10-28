@@ -11,8 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getSalesMap } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
+import type { MapArea } from "@shared/sales-map-view"
 import { addDays, formatDay, today } from "../dashboard/periods"
-import { aggregate, type MapArea } from "./aggregate"
 import { AGE_STOPS, age, ageColorExpression, strength } from "./scale"
 
 type Props = { onBack: () => void }
@@ -32,7 +32,8 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 /**
  * Where the team sold, per PC4 area: red where the newest sale is days old, fading through yellow to grey at the
- * start of the period, and darker where more was sold. Everyone sees the whole team.
+ * start of the period, and darker where more was sold. Everyone sees the whole team's areas; only admins also get
+ * the numbers (per area, per recruiter, in total), which the server leaves out for recruiters.
  */
 export function SalesMapPage({ onBack }: Props) {
   const [periodDays, setPeriodDays] = useState<number>(90)
@@ -44,7 +45,7 @@ export function SalesMapPage({ onBack }: Props) {
     placeholderData: keepPreviousData,
   })
   const map = query.data?.map
-  const areas = useMemo(() => aggregate(map?.areas ?? []), [map])
+  const areas = useMemo(() => new Map(map?.areas.map((a) => [a.postcode, a]) ?? []), [map])
   const names = useMemo(() => new Map(map?.recruiters.map((r) => [r.number, r.name]) ?? []), [map])
 
   return (
@@ -101,10 +102,10 @@ export function SalesMapPage({ onBack }: Props) {
 
       <SalesMap areas={areas} names={names} periodDays={periodDays} until={until} />
 
-      {map && (
+      {map?.detailed && (
         <p className="border-t bg-background px-4 py-1.5 text-xs text-muted-foreground">
-          {map.areas.reduce((sum, a) => sum + a.sold, 0)} verkopen op de kaart
-          {map.unplaced > 0 && `, ${map.unplaced} zonder bekende postcode`}. Ook opgezegde verkopen tellen mee.
+          {map.areas.reduce((sum, a) => sum + (a.sold ?? 0), 0)} verkopen op de kaart
+          {(map.unplaced ?? 0) > 0 && `, ${map.unplaced} zonder bekende postcode`}. Ook opgezegde verkopen tellen mee.
         </p>
       )}
     </div>
@@ -201,11 +202,10 @@ function SalesMap({ areas, names, periodDays, until }: MapProps) {
     const map = mapRef.current
     if (!map || !loaded) return
     map.removeFeatureState({ source: SOURCE })
-    const maxSold = Math.max(0, ...[...areas.values()].map((a) => a.sold))
     for (const area of areas.values()) {
       map.setFeatureState(
         { source: SOURCE, id: area.postcode },
-        { has: true, age: age(area.lastSoldOn, until, periodDays), strength: strength(area.sold, maxSold) },
+        { has: true, age: age(area.lastSoldOn, until, periodDays), strength: strength(area.level) },
       )
     }
   }, [areas, loaded, periodDays, until])
@@ -231,9 +231,13 @@ function popupContent(postcode: string, area: MapArea | undefined, names: Map<st
     add("div", "Geen verkopen in deze periode", "text-muted-foreground")
     return root
   }
+  if (area.sold === undefined) {
+    add("div", `Laatste verkoop op ${formatDay(area.lastSoldOn)}`)
+    return root
+  }
   add("div", `${area.sold} ${area.sold === 1 ? "verkoop" : "verkopen"}, laatste op ${formatDay(area.lastSoldOn)}`)
   const list = add("ul", "", "pt-1")
-  for (const r of area.recruiters) {
+  for (const r of area.recruiters ?? []) {
     const item = document.createElement("li")
     item.textContent = `${names.get(r.recruiter) ?? r.recruiter}: ${r.sold}`
     list.append(item)

@@ -33,9 +33,3 @@ export const salesMapSchema = z.object({
 
 export type SalesMap = z.infer<typeof salesMapSchema>
 export type SalesMapArea = SalesMap["areas"][number]
-
-export type SalesMapResponse = {
-  /** True when the Contracts API is not configured and the areas are made up. */
-  demo: boolean
-  map: SalesMap
-}

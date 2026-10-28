@@ -1,4 +1,5 @@
 import type { ExpressionSpecification } from "maplibre-gl"
+import { LEVELS } from "@shared/sales-map-view"
 
 /**
  * How an area is drawn. Its colour says how long ago the newest sale there was, its darkness how many sales there
@@ -13,7 +14,7 @@ export const AGE_STOPS: [age: number, color: string][] = [
   [1, "#9ca3af"], // grey: the start of the period
 ]
 
-/** Fill opacity of the area with the fewest and with the most sales at the shown level. */
+/** Fill opacity of level 1 (fewest sales) and of the top level (as many as the busiest area). */
 export const STRENGTH_RANGE = [0.25, 0.85] as const
 
 /** The newest sale's age as a share of a period of `periodDays`, between 0 and 1. */
@@ -22,11 +23,10 @@ export function age(lastSoldOn: string, today: string, periodDays: number): numb
   return Math.min(1, Math.max(0, days / periodDays))
 }
 
-/** Opacity for `sold` sales when the busiest area has `maxSold`, on a log scale so one busy area can't dim the rest. */
-export function strength(sold: number, maxSold: number): number {
+/** Fill opacity for an area's level (1 to LEVELS), evenly spread over STRENGTH_RANGE. */
+export function strength(level: number): number {
   const [low, high] = STRENGTH_RANGE
-  if (maxSold <= 1) return high
-  return low + ((high - low) * Math.log(sold)) / Math.log(maxSold)
+  return low + ((high - low) * (level - 1)) / (LEVELS - 1)
 }
 
 /** AGE_STOPS as a MapLibre interpolate expression on the feature state `age`. */

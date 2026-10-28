@@ -126,9 +126,10 @@ made-up numbers and the page says so. In development, open `http://localhost:517
 **Sales map.** Account menu → "Verkoopkaart", shown together with the dashboard. Everyone sees where the whole
 team sold in the last 30 days, 90 days or year, cancelled sales included. The `sales-map` function reads
 `GET http://test.zekerenmobiel.nl/Sales/2026.1/Map` with `STATS_API_KEY`: sales per full postcode, answered from the
-same in-memory cache as the stats (refreshed every 15 minutes). The app sums them to PC4 areas. Colour is the age
-of an area's newest sale (red today, yellow, grey at the start of the period); darker means more sales. In
-development: `?demo&kaart`.
+same in-memory cache as the stats (refreshed every 15 minutes), and sums them to PC4 areas. Colour is the age of an
+area's newest sale (red today, yellow, grey at the start of the period); darker means more sales, in five shades on a
+log scale. Admins also see the numbers: per area, per recruiter and in total. For recruiters the function sends only
+the shade, never a count. In development: `?demo&kaart` (admin) or `?demo=werver&kaart`.
 
 The areas are `public/nl-pc4.geojson` (about 2 MB, 400 kB gzipped), built from CBS postcode statistics on PDOK with
 `node scripts/build-pc4-areas.mjs <year>` when CBS publishes a new year. The map credits CBS and Esri Nederland for
