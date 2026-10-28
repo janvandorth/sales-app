@@ -10,6 +10,7 @@ import type { ExtractedFields, FormInput } from "@shared/form-schema"
 import type { KpiRequest, KpiResponse } from "@shared/kpi"
 import type { SalesMapRequest } from "@shared/sales-map"
 import type { SalesMapResponse } from "@shared/sales-map-view"
+import type { SalesOpportunitiesRequest, SalesOpportunitiesResponse } from "@shared/sales-opportunities"
 import { SCANS_BUCKET } from "@shared/storage"
 import type { Recruiter } from "@shared/submission-record"
 import { IS_TEST_DEPLOYMENT, TEST_DEPLOYMENT_HEADER } from "@/lib/deployment"
@@ -122,9 +123,27 @@ export async function getSalesMap(request: SalesMapRequest): Promise<SalesMapRes
     const { demoSalesMap } = await import("@shared/sales-map-demo")
     const { salesMapView } = await import("@shared/sales-map-view")
     await new Promise((resolve) => setTimeout(resolve, 400))
-    return { demo: true, map: salesMapView(demoSalesMap(request.from, request.to), DEMO_MODE === "admin") }
+    const map = demoSalesMap(request.from, request.to)
+    return { demo: true, map: salesMapView(map, DEMO_MODE === "admin", request.from, request.to) }
   }
   return invoke<SalesMapResponse>("sales-map", { ...request })
+}
+
+export async function getSalesOpportunities(request: SalesOpportunitiesRequest): Promise<SalesOpportunitiesResponse> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const demo = await import("@shared/sales-opportunities-demo")
+    const { opportunitiesView, opportunityStreetsView } = await import("@shared/sales-opportunities")
+    const detailed = DEMO_MODE === "admin"
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return request.action === "areas"
+      ? { demo: true, action: "areas", view: opportunitiesView(demo.demoOpportunityAreas(request.woz), detailed) }
+      : {
+          demo: true,
+          action: "streets",
+          view: opportunityStreetsView(demo.demoOpportunityStreets(request.pc4, request.woz), detailed),
+        }
+  }
+  return invoke<SalesOpportunitiesResponse>("sales-opportunities", { ...request })
 }
 
 // --- Sales per day ------------------------------------------------------------------------------

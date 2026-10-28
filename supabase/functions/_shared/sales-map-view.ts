@@ -12,6 +12,8 @@ export type MapArea = {
   postcode: string
   city: string
   lastSoldOn: string
+  /** How long ago `lastSoldOn` was as a share of the period: 0 = its last day, 1 = its first day. */
+  age: number
   /** 1 (fewest sales) to LEVELS (as many as the busiest area), on a log scale. */
   level: number
   sold?: number
@@ -36,13 +38,18 @@ export type SalesMapView = {
   recruiters: { number: string; name: string }[]
 }
 
-type Sum = { area: Omit<Required<MapArea>, "level">; cities: Map<string, number>; recruiters: Map<string, number> }
+type Sum = {
+  area: Omit<Required<MapArea>, "level" | "age">
+  cities: Map<string, number>
+  recruiters: Map<string, number>
+}
 
 /**
- * The PC6 rows summed to PC4: a PC4 area holds the sales of every PC6 that starts with it, its newest sale day, the
- * city most of those sales were at, and its level. Without `detailed`, the counts are left out.
+ * The PC6 rows summed to PC4: a PC4 area holds the sales of every PC6 that starts with it, its newest sale day and
+ * that day's age in the period `from`..`to` (yyyy-MM-dd), the city most of those sales were at, and its level.
+ * Without `detailed`, the counts are left out.
  */
-export function salesMapView(map: SalesMap, detailed: boolean): SalesMapView {
+export function salesMapView(map: SalesMap, detailed: boolean, from: string, to: string): SalesMapView {
   const sums = new Map<string, Sum>()
   for (const pc6 of map.areas) {
     const postcode = pc6.postcode.slice(0, 4)
@@ -64,12 +71,16 @@ export function salesMapView(map: SalesMap, detailed: boolean): SalesMapView {
   const maxSold = Math.max(0, ...[...sums.values()].map((s) => s.area.sold))
   const areas: MapArea[] = [...sums.values()]
     .map(({ area, cities, recruiters }) => {
-      const shown = { postcode: area.postcode, city: mostOf(cities) ?? "", lastSoldOn: area.lastSoldOn }
-      const level = levelOf(area.sold, maxSold)
-      if (!detailed) return { ...shown, level }
+      const shown = {
+        postcode: area.postcode,
+        city: mostOf(cities) ?? "",
+        lastSoldOn: area.lastSoldOn,
+        age: ageIn(area.lastSoldOn, from, to),
+        level: levelOf(area.sold, maxSold),
+      }
+      if (!detailed) return shown
       return {
         ...shown,
-        level,
         sold: area.sold,
         recruiters: [...recruiters]
           .map(([recruiter, sold]) => ({ recruiter, sold }))
@@ -90,6 +101,14 @@ export function salesMapView(map: SalesMap, detailed: boolean): SalesMapView {
 export function levelOf(sold: number, maxSold: number): number {
   if (maxSold <= 1) return LEVELS
   return 1 + Math.round(((LEVELS - 1) * Math.log(sold)) / Math.log(maxSold))
+}
+
+/** How long before `to` the day `date` is, as a share of the period `from`..`to`, between 0 and 1. */
+export function ageIn(date: string, from: string, to: string): number {
+  const day = 86_400_000
+  const length = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / day + 1
+  const ago = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / day
+  return Math.min(1, Math.max(0, ago / length))
 }
 
 /** The key with the highest count; ties go to the alphabetically first. */

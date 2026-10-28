@@ -23,7 +23,7 @@ serve(async (req) => {
 
   const key = optionalEnv("STATS_API_KEY")
   const map = key ? await fetchMap(mapUrl(), key, from, to) : demoSalesMap(from, to)
-  const response: SalesMapResponse = { demo: !key, map: salesMapView(map, profile.is_admin === true) }
+  const response: SalesMapResponse = { demo: !key, map: salesMapView(map, profile.is_admin === true, from, to) }
   return json(response)
 })
 

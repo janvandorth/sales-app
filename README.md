@@ -131,6 +131,15 @@ area's newest sale (red today, yellow, grey at the start of the period); darker 
 log scale. Admins also see the numbers: per area, per recruiter and in total. For recruiters the function sends only
 the shade, never a count. In development: `?demo&kaart` (admin) or `?demo=werver&kaart`.
 
+**Kansen.** The map's second view: where households are still "for grabs". The `sales-opportunities` function reads
+`GET …/Sales/2026.1/Opportunities?woz=low|mid|high`, where the Contracts API counts per street (PC6): CBS households
+minus our active customers (not archived, counted nightly), for the streets whose average WOZ value falls in the
+band (each band a third of all households), added up per PC4. So one promising street is never averaged away by the
+streets around it. The map shades PC4 areas in blue by open households; tapping one asks
+`…/Opportunities/{pc4}` for its best streets, with names from ZMPostcode. Admins see households, customers, open
+households and WOZ per area and per street; recruiters see only the shades and the ranked streets. All numbers are
+computed in the backend; the app only draws what it receives.
+
 The areas are `public/nl-pc4.geojson` (about 2 MB, 400 kB gzipped), built from CBS postcode statistics on PDOK with
 `node scripts/build-pc4-areas.mjs <year>` when CBS publishes a new year. The map credits CBS and Esri Nederland for
 the areas and PDOK for the background, as their licences require.

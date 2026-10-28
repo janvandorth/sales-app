@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 import type { SalesMap } from "./sales-map.ts"
-import { LEVELS, levelOf, salesMapView } from "./sales-map-view.ts"
+import { ageIn, LEVELS, levelOf, salesMapView } from "./sales-map-view.ts"
+
+// 90 days: 3811's newest sale (20 October) is 7 days before the end, 3812's (5 October) 22.
+const FROM = "2026-07-30"
+const TO = "2026-10-27"
 
 const area = (
   postcode: string,
@@ -30,7 +34,7 @@ const map: SalesMap = {
 }
 
 describe("salesMapView for an admin", () => {
-  const view = salesMapView(map, true)
+  const view = salesMapView(map, true, FROM, TO)
 
   it("sums PC6 postcodes into PC4 with the newest sale, the main city and who sold there", () => {
     expect(view.areas[0]).toEqual({
@@ -39,6 +43,7 @@ describe("salesMapView for an admin", () => {
       sold: 6,
       level: LEVELS,
       lastSoldOn: "2026-10-20",
+      age: 7 / 90,
       recruiters: [
         { recruiter: "0212BB", sold: 3 },
         { recruiter: "0618BB", sold: 3 },
@@ -54,14 +59,14 @@ describe("salesMapView for an admin", () => {
 })
 
 describe("salesMapView for a recruiter", () => {
-  const view = salesMapView(map, false)
+  const view = salesMapView(map, false, FROM, TO)
 
   it("gives where, when and a shade for how much, but no count of any kind", () => {
     expect(view).toEqual({
       detailed: false,
       areas: [
-        { postcode: "3811", city: "Amersfoort", lastSoldOn: "2026-10-20", level: 5 },
-        { postcode: "3812", city: "Amersfoort", lastSoldOn: "2026-10-05", level: 4 },
+        { postcode: "3811", city: "Amersfoort", lastSoldOn: "2026-10-20", age: 7 / 90, level: 5 },
+        { postcode: "3812", city: "Amersfoort", lastSoldOn: "2026-10-05", age: 22 / 90, level: 4 },
       ],
       recruiters: [],
     })
@@ -83,8 +88,19 @@ describe("levelOf", () => {
   })
 })
 
+describe("ageIn", () => {
+  it.each([
+    ["2026-10-27", 0], // the last day
+    ["2026-10-18", 0.1], // 9 of 90 days
+    ["2026-07-29", 1], // before the period: as old as its first day
+    ["2026-10-28", 0], // a sale dated after the period by mistake
+  ])("a newest sale on %s in 30 July to 27 October is %s", (date, expected) => {
+    expect(ageIn(date, FROM, TO)).toBeCloseTo(expected, 5)
+  })
+})
+
 describe("salesMapView without sales", () => {
   it("gives no areas", () => {
-    expect(salesMapView({ ...map, areas: [], unplaced: 0 }, true).areas).toEqual([])
+    expect(salesMapView({ ...map, areas: [], unplaced: 0 }, true, FROM, TO).areas).toEqual([])
   })
 })

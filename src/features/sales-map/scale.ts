@@ -2,11 +2,12 @@ import type { ExpressionSpecification } from "maplibre-gl"
 import { LEVELS } from "@shared/sales-map-view"
 
 /**
- * How an area is drawn. Its colour says how long ago the newest sale there was, its darkness how many sales there
- * were, so "worked here last week" and "worked here a lot" can be read separately.
+ * How an area is drawn, from the numbers the backend computed. On the sales map its colour says how long ago the
+ * newest sale there was and its darkness how many sales there were; on "kansen" it is blue, darker where more
+ * households are still not a customer.
  */
 
-/** Colour by age of the newest sale as a share of the period: 0 = today, 1 = the first day of the period. */
+/** Colour by age of the newest sale as a share of the period: 0 = its last day, 1 = its first day. */
 export const AGE_STOPS: [age: number, color: string][] = [
   [0, "#dc2626"], // red: the last few days
   [0.15, "#f97316"], // orange
@@ -14,14 +15,11 @@ export const AGE_STOPS: [age: number, color: string][] = [
   [1, "#9ca3af"], // grey: the start of the period
 ]
 
-/** Fill opacity of level 1 (fewest sales) and of the top level (as many as the busiest area). */
-export const STRENGTH_RANGE = [0.25, 0.85] as const
+/** The colour of "kansen". */
+export const OPPORTUNITY_COLOR = "#1d4ed8"
 
-/** The newest sale's age as a share of a period of `periodDays`, between 0 and 1. */
-export function age(lastSoldOn: string, today: string, periodDays: number): number {
-  const days = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastSoldOn}T00:00:00Z`)) / 86_400_000
-  return Math.min(1, Math.max(0, days / periodDays))
-}
+/** Fill opacity of level 1 (the least) and of the top level (as much as the area with the most). */
+export const STRENGTH_RANGE = [0.25, 0.85] as const
 
 /** Fill opacity for an area's level (1 to LEVELS), evenly spread over STRENGTH_RANGE. */
 export function strength(level: number): number {

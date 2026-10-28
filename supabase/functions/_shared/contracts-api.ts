@@ -14,6 +14,7 @@ const ONBOARDING_URL = {
 
 const STATS_URL = "http://test.zekerenmobiel.nl/Sales/2026.1/Stats"
 const MAP_URL = "http://test.zekerenmobiel.nl/Sales/2026.1/Map"
+const OPPORTUNITIES_URL = "http://test.zekerenmobiel.nl/Sales/2026.1/Opportunities"
 
 function environment(secret: string): "test" | "production" {
   const value = optionalEnv(secret) ?? "test"
@@ -41,4 +42,9 @@ export function statsUrl(): string {
 /** GET endpoint with sales per postcode for the map; on TEST and with STATS_API_KEY, like the stats. */
 export function mapUrl(): string {
   return MAP_URL
+}
+
+/** GET endpoints with households not yet a customer: per PC4, or (with a PC4) its best streets. TEST, STATS_API_KEY. */
+export function opportunitiesUrl(pc4?: string): string {
+  return pc4 ? `${OPPORTUNITIES_URL}/${pc4}` : OPPORTUNITIES_URL
 }
