@@ -406,6 +406,14 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }
             maxzoom: 19,
             attribution: "Achtergrond: PDOK, Kadaster",
           },
+          // The same map's names alone, on a transparent background, drawn again over the coloured areas so a street
+          // stays readable under the darkest shade.
+          labels: {
+            type: "raster",
+            tiles: ["https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/labels/EPSG:3857/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            maxzoom: 19,
+          },
           pc4: tiles("pc4"),
           pc5: tiles("pc5"),
           pc6: tiles("pc6"),
@@ -436,6 +444,7 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, onView, onDrawing }
               },
             },
           ]),
+          { id: "labels", type: "raster", source: "labels", minzoom: PC5_ZOOM },
         ],
       },
     })
