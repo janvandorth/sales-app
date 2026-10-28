@@ -2,7 +2,6 @@ import { lazy, Suspense, useState } from "react"
 import { Toaster } from "@/components/ui/sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { AdminPage } from "@/features/admin/admin-page"
-import type { AreaAssignment, AreaMember, AssignStart } from "@/features/areas/areas"
 import type { Door } from "@/features/areas/doors"
 import { MyAreasPage } from "@/features/areas/my-areas-page"
 import { PlanningPage } from "@/features/areas/planning-page"
@@ -16,14 +15,10 @@ import { SalesListPage } from "@/features/sales-list/sales-list-page"
 import { useProfile, type Profile } from "@/hooks/use-profile"
 import { DEMO_MODE } from "@/lib/api"
 import { IS_TEST_DEPLOYMENT, WALK_AS_WERVER } from "@/lib/deployment"
+import { pageFromUrl, useNavigation, type MapStart, type Page, type View } from "@/lib/navigation"
 
 // Loaded on first use: MapLibre is large and the sales form should not wait for it.
 const SalesMapPage = lazy(() => import("@/features/sales-map/map-page").then((m) => ({ default: m.SalesMapPage })))
-
-type View = "form" | "dashboard" | "map" | "sales" | "admin" | "planning" | "areas" | "walk"
-
-/** How the map opens: plain, giving out an area, or on one area; and where its back button goes. */
-type MapStart = { assign?: AssignStart; focus?: AreaAssignment; back: View; key: number }
 
 /** Dev only: `?demo&verkopen`, `?demo&kaart`, `?demo&planning` or `?demo=werver&gebieden` opens that page. */
 function demoView(): View {
@@ -41,34 +36,34 @@ const pageSpinner = (
   </div>
 )
 
+const FORM: Page = { view: "form" }
+
 export default function App() {
   const { session, loading, needsPassword, isInvite, passwordSet } = useSession()
-  const [view, setView] = useState<View>(() => (import.meta.env.DEV && DEMO_MODE ? demoView() : "form"))
-  const [mapStart, setMapStart] = useState<MapStart>({ back: "form", key: 0 })
-  /** The werver whose areas a manager opened from the planning; null for one's own. */
-  const [viewedAs, setViewedAs] = useState<AreaMember | null>(null)
-  /** The area being walked door by door. */
-  const [walking, setWalking] = useState<AreaAssignment | null>(null)
+  const { page, go, back } = useNavigation(() =>
+    import.meta.env.DEV && DEMO_MODE
+      ? { view: demoView(), map: { key: 0 } }
+      : pageFromUrl(window.location.pathname, window.location.search),
+  )
+  const { view, viewedAs, walking } = page
   /** The door marked "Verkocht": the sales form opens with its address filled in. */
   const [soldAt, setSoldAt] = useState<Door | null>(null)
   const profile = useProfile(session?.user.id)
 
-  const openMap = (start: Omit<MapStart, "key">) => {
-    setMapStart({ ...start, key: mapStart.key + 1 })
-    setView("map")
-  }
+  const openMap = (map: Omit<MapStart, "key">) => go({ view: "map", map: { ...map, key: Date.now() } })
 
   /** The map and the area pages, which lead to each other; null for any other view. */
   function areaViews(profile: Profile | undefined) {
     if (view === "map") {
+      const map = page.map ?? { key: 0 }
       return (
         <Suspense fallback={pageSpinner}>
           <SalesMapPage
-            key={mapStart.key}
+            key={map.key}
             isAdmin={profile?.isAdmin}
-            assign={mapStart.assign}
-            focus={mapStart.focus}
-            onBack={() => setView(mapStart.back)}
+            assign={map.assign}
+            focus={map.focus}
+            onBack={() => back(FORM)}
           />
         </Suspense>
       )
@@ -76,13 +71,10 @@ export default function App() {
     if (view === "planning") {
       return (
         <PlanningPage
-          onBack={() => setView("form")}
-          onAssign={(assign) => openMap({ assign, back: "planning" })}
-          onShow={(focus) => openMap({ focus, back: "planning" })}
-          onViewAs={(werver) => {
-            setViewedAs(werver)
-            setView("areas")
-          }}
+          onBack={() => back(FORM)}
+          onAssign={(assign) => openMap({ assign })}
+          onShow={(focus) => openMap({ focus })}
+          onViewAs={(werver) => go({ view: "areas", viewedAs: werver })}
         />
       )
     }
@@ -91,15 +83,9 @@ export default function App() {
         <MyAreasPage
           wervernr={viewedAs?.wervernr ?? profile?.wervernr}
           viewedAs={viewedAs?.name}
-          onBack={() => {
-            setView(viewedAs ? "planning" : "form")
-            setViewedAs(null)
-          }}
-          onShow={(focus) => openMap({ focus, back: "areas" })}
-          onWalk={(area) => {
-            setWalking(area)
-            setView("walk")
-          }}
+          onBack={() => back(viewedAs ? { view: "planning" } : FORM)}
+          onShow={(focus) => openMap({ focus })}
+          onWalk={(area) => go({ view: "walk", walking: area, viewedAs })}
         />
       )
     }
@@ -109,10 +95,10 @@ export default function App() {
           area={walking}
           // Doors are logged under whoever walks; on the test deployment a manager on a werver's page walks as them.
           wervernr={(WALK_AS_WERVER && viewedAs?.wervernr) || profile?.wervernr}
-          onBack={() => setView("areas")}
+          onBack={() => back({ view: "areas", viewedAs })}
           onSold={(door) => {
             setSoldAt(door)
-            setView("form")
+            go(FORM)
           }}
         />
       )
@@ -125,32 +111,32 @@ export default function App() {
       const demoProfile = { wervernaam: "Jan van Dorth", wervernr: "0212BB", isAdmin: DEMO_MODE === "admin" }
       const areaView = areaViews(demoProfile)
       if (areaView) return areaView
-      if (view === "sales") return <SalesListPage profile={demoProfile} userId={undefined} onBack={() => {}} />
-      return <DashboardPage profile={demoProfile} onBack={() => {}} />
+      if (view === "sales") return <SalesListPage profile={demoProfile} userId={undefined} onBack={() => back(FORM)} />
+      return <DashboardPage profile={demoProfile} onBack={() => back(FORM)} />
     }
     if (loading) return pageSpinner
     if (!session) return <LoginPage />
     if (needsPassword) {
       return <SetPasswordPage email={session.user.email ?? ""} isInvite={isInvite} onDone={passwordSet} />
     }
-    if (view === "dashboard") return <DashboardPage profile={profile} onBack={() => setView("form")} />
+    if (view === "dashboard") return <DashboardPage profile={profile} onBack={() => back(FORM)} />
     const areaView = areaViews(profile)
     if (areaView) return areaView
     if (view === "sales") {
-      return <SalesListPage profile={profile} userId={session.user.id} onBack={() => setView("form")} />
+      return <SalesListPage profile={profile} userId={session.user.id} onBack={() => back(FORM)} />
     }
-    if (view === "admin") return <AdminPage currentUserId={session.user.id} onBack={() => setView("form")} />
+    if (view === "admin") return <AdminPage currentUserId={session.user.id} onBack={() => back(FORM)} />
     return (
       <FormPage
         key={session.user.id}
         session={session}
-        onOpenDashboard={() => setView("dashboard")}
-        onOpenMap={() => openMap({ back: "form" })}
-        onOpenAreas={() => setView(profile?.isAdmin ? "planning" : "areas")}
+        onOpenDashboard={() => go({ view: "dashboard" })}
+        onOpenMap={() => openMap({})}
+        onOpenAreas={() => go({ view: profile?.isAdmin ? "planning" : "areas" })}
         soldAt={soldAt}
         onSoldAtFilled={() => setSoldAt(null)}
-        onOpenSales={() => setView("sales")}
-        onOpenAdmin={() => setView("admin")}
+        onOpenSales={() => go({ view: "sales" })}
+        onOpenAdmin={() => go({ view: "admin" })}
       />
     )
   }
