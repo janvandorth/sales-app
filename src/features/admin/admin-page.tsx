@@ -6,12 +6,12 @@ import {
   MailIcon,
   MoreVerticalIcon,
   PencilIcon,
-  RefreshCwIcon,
   ScanTextIcon,
   ShieldCheckIcon,
   UserPlusIcon,
 } from "lucide-react"
 import type { AdminUser } from "@shared/admin-types"
+import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -37,28 +37,12 @@ export function AdminPage({ currentUserId, onBack }: Props) {
     <div className="min-h-svh bg-muted">
       <PageHeader
         start={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Terug naar formulier"
-            onClick={onBack}
-          >
+          <Button variant="ghost" size="icon" className={HEADER_BUTTON_CLASS} aria-label="Terug" onClick={onBack}>
             <ArrowLeftIcon />
           </Button>
         }
         title="Beheer wervers"
-        end={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Vernieuwen"
-            onClick={() => void users.refetch()}
-          >
-            <RefreshCwIcon className={users.isFetching ? "animate-spin" : undefined} />
-          </Button>
-        }
+        end={<AppMenu />}
       />
 
       <main className={`mx-auto flex flex-col gap-4 p-4 ${PAGE_WIDTH}`}>

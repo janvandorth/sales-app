@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowLeftIcon, FileTextIcon, LocateFixedIcon, MapPinIcon, Undo2Icon } from "lucide-react"
 import { toast } from "sonner"
+import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -175,12 +176,7 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
           </Button>
         }
         title={street?.name ?? "Lopen"}
-        end={
-          <span className="text-xs whitespace-nowrap">
-            {mine.length} {mine.length === 1 ? "deur" : "deuren"} · {mine.filter((v) => v.outcome === "sold").length}{" "}
-            verkocht
-          </span>
-        }
+        end={<AppMenu />}
       />
 
       <div className={`mx-auto flex w-full flex-1 flex-col gap-3 px-4 py-3 ${PAGE_WIDTH}`}>
@@ -188,6 +184,10 @@ export function WalkPage({ area, wervernr, onBack, onSold }: Props) {
           <MapPinIcon className={cn("size-4", position ? "text-teal-700" : "")} />
           {door ? `${door.postcode.slice(0, 4)} ${door.postcode.slice(4)}` : (street?.plaats ?? "")}
           {outside && <span className="font-medium text-orange-700">· je bent buiten je gebied</span>}
+          <span className="ml-auto whitespace-nowrap">
+            {mine.length} {mine.length === 1 ? "deur" : "deuren"} · {mine.filter((v) => v.outcome === "sold").length}{" "}
+            verkocht
+          </span>
         </div>
 
         {streets.length > 1 && (

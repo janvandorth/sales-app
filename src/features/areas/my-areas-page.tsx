@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react"
-import { ArrowLeftIcon, ChevronRightIcon, FootprintsIcon, NavigationIcon, RefreshCwIcon } from "lucide-react"
+import { ArrowLeftIcon, ChevronRightIcon, FootprintsIcon, NavigationIcon } from "lucide-react"
+import { AppMenu } from "@/components/app-menu"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -63,17 +64,7 @@ export function MyAreasPage({ wervernr, viewedAs, onBack, onShow, onWalk }: Prop
           </Button>
         }
         title={viewedAs ? `Gebieden van ${firstName(viewedAs)}` : "Mijn gebieden"}
-        end={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={HEADER_BUTTON_CLASS}
-            aria-label="Vernieuwen"
-            onClick={() => void areas.refetch()}
-          >
-            <RefreshCwIcon className={areas.isFetching ? "animate-spin" : undefined} />
-          </Button>
-        }
+        end={<AppMenu />}
       />
 
       <div className={`mx-auto space-y-2.5 px-4 py-4 ${PAGE_WIDTH}`}>
