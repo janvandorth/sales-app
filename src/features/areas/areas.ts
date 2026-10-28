@@ -25,9 +25,17 @@ export type AreaAssignment = {
   members: AreaMember[]
   /** Sales its wervers booked in the area between its first and last day. */
   sold: number
+  /** Doors rung in it so far. */
+  visited: number
 }
 
-export type NewAreaAssignment = Omit<AreaAssignment, "id" | "members" | "sold">
+export type NewAreaAssignment = Omit<AreaAssignment, "id" | "members" | "sold" | "visited">
+
+/** The share of its addresses walked, 0..1; null when its size is not known. */
+export function walkedShare(a: Pick<AreaAssignment, "households" | "visited">): number | null {
+  if (!a.households) return null
+  return Math.min(1, a.visited / a.households)
+}
 
 /** What the map starts with when the planning sends it to give out an area. */
 export type AssignStart = { wervernr?: string; days?: { startsOn: string; endsOn: string } }

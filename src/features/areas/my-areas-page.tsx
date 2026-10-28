@@ -1,12 +1,26 @@
-import { ArrowLeftIcon, ChevronRightIcon, MapIcon, NavigationIcon, RefreshCwIcon } from "lucide-react"
+import { lazy, Suspense } from "react"
+import { ArrowLeftIcon, ChevronRightIcon, FootprintsIcon, NavigationIcon, RefreshCwIcon } from "lucide-react"
 import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { getErrorMessage } from "@/lib/errors"
 import { addDays, formatDay, periodStart, today } from "../dashboard/periods"
-import { areaTitle, firstName, isoWeek, routeUrl, runsOn, spanLabel, weekday, type AreaAssignment } from "./areas"
+import {
+  areaTitle,
+  firstName,
+  isoWeek,
+  routeUrl,
+  runsOn,
+  spanLabel,
+  weekday,
+  walkedShare,
+  type AreaAssignment,
+} from "./areas"
 import { useAreaAssignments } from "./use-areas"
+
+// MapLibre is loaded with the first card that shows a map, not with the page.
+const AreaThumbnail = lazy(() => import("../sales-map/area-thumbnail"))
 
 type Props = {
   /** Whose areas: the werver's own number, also to leave them out of "met …". */
@@ -16,6 +30,8 @@ type Props = {
   onBack: () => void
   /** Opens the map on an area. */
   onShow: (area: AreaAssignment) => void
+  /** Starts walking an area door by door. */
+  onWalk: (area: AreaAssignment) => void
 }
 
 /** How far back finished areas are listed, and how far ahead coming ones. */
@@ -26,7 +42,7 @@ const DAYS_AHEAD = 42
  * Where the werver goes: today's areas up top with the way there, then the rest of the week, later weeks and the
  * past two weeks. Kansen show as shades on the map, as everywhere for wervers; no numbers here.
  */
-export function MyAreasPage({ wervernr, viewedAs, onBack, onShow }: Props) {
+export function MyAreasPage({ wervernr, viewedAs, onBack, onShow, onWalk }: Props) {
   const now = today()
   const saturday = addDays(periodStart(now, "week"), 5)
   const areas = useAreaAssignments(addDays(now, -DAYS_BACK), addDays(now, DAYS_AHEAD))
@@ -81,30 +97,49 @@ export function MyAreasPage({ wervernr, viewedAs, onBack, onShow }: Props) {
           </Heading>
         )}
         {todays.map((area) => (
-          <div key={area.id} className="space-y-2.5 rounded-xl border bg-background p-4">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-lg font-bold">{areaTitle(area)}</span>
-              <span className="text-sm text-muted-foreground">
-                {[
-                  area.endsOn > now && `t/m ${weekday(area.endsOn)}`,
-                  others(area).length && `met ${others(area).join(" en ")}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </div>
-            {area.note && <p className="rounded-md bg-muted px-3 py-2 text-sm">{area.note}</p>}
-            <div className="flex gap-2">
-              <Button className="h-11 flex-1 text-base" onClick={() => onShow(area)}>
-                <MapIcon /> Op de kaart
-              </Button>
-              {area.bounds && (
-                <Button variant="outline" className="h-11 text-base" asChild>
-                  <a href={routeUrl(area.bounds)} target="_blank" rel="noreferrer">
-                    <NavigationIcon /> Route
-                  </a>
+          <div key={area.id} className="overflow-hidden rounded-xl border bg-background">
+            {area.bounds && (
+              <button
+                type="button"
+                className="relative block h-40 w-full bg-muted"
+                aria-label={`${areaTitle(area)} op de kaart`}
+                onClick={() => onShow(area)}
+              >
+                <Suspense fallback={null}>
+                  <AreaThumbnail area={area} />
+                </Suspense>
+                {walkedShare(area) !== null && (
+                  <span className="absolute top-2.5 right-2.5 rounded-md bg-background px-2 py-1 text-xs font-semibold shadow">
+                    {Math.round(walkedShare(area)! * 100)}% gelopen
+                  </span>
+                )}
+              </button>
+            )}
+            <div className="space-y-2.5 p-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-lg font-bold">{areaTitle(area)}</span>
+                <span className="text-sm text-muted-foreground">
+                  {[
+                    area.endsOn > now && `t/m ${weekday(area.endsOn)}`,
+                    others(area).length && `met ${others(area).join(" en ")}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </div>
+              {area.note && <p className="rounded-md bg-muted px-3 py-2 text-sm">{area.note}</p>}
+              <div className="flex gap-2">
+                <Button className="h-11 flex-1 text-base" onClick={() => onWalk(area)}>
+                  <FootprintsIcon /> Start lopen
                 </Button>
-              )}
+                {area.bounds && (
+                  <Button variant="outline" className="h-11 text-base" asChild>
+                    <a href={routeUrl(area.bounds)} target="_blank" rel="noreferrer">
+                      <NavigationIcon /> Route
+                    </a>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         ))}

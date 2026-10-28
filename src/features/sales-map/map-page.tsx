@@ -2,9 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import * as maplibregl from "maplibre-gl"
 import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl"
-import "maplibre-gl/dist/maplibre-gl.css"
-import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
-import { Protocol } from "pmtiles"
 import { ArrowLeftIcon, RefreshCwIcon, ZoomInIcon } from "lucide-react"
 import { toast } from "sonner"
 import { HEADER_BUTTON_CLASS, PageHeader } from "@/components/page-header"
@@ -46,6 +43,7 @@ import {
 } from "../areas/map-overlay"
 import { useAreaAssignments, useCreateAreaAssignment, useRecruiters } from "../areas/use-areas"
 import { addDays, formatDay, today } from "../dashboard/periods"
+import { BACKGROUND_SOURCE, postcodeSource } from "./map-setup"
 import { AGE_STOPS, fillColor, fillOpacity, KANSEN_COLORS, STREET_OPACITY } from "./scale"
 
 type Props = {
@@ -68,14 +66,6 @@ const PERIODS = [
   { days: 90, label: "90 dagen" },
   { days: 365, label: "1 jaar" },
 ] as const
-
-/**
- * Where pc4.pmtiles, pc5.pmtiles and pc6.pmtiles are (scripts/build-postcode-tiles.mjs): the outlines, with only
- * the postcode, as vector tiles. They are static, so the browser caches them and the backend sends no shapes.
- */
-const TILES_URL =
-  import.meta.env.VITE_POSTCODE_TILES_URL ??
-  `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/postcode-tiles/2025`
 
 /** From this zoom the PC5 areas in view are drawn over the PC4 areas. */
 const PC5_ZOOM = 11
@@ -103,11 +93,6 @@ const LEVEL_NAMES: Record<Level, string> = { pc4: "PC4", pc5: "PC5", pc6: "PC6" 
 /** The badge at the top left of the map, for loading while panning and the zoom hint. */
 const BADGE_CLASS =
   "absolute top-3 left-3 z-10 flex items-center gap-2.5 rounded-full bg-background/95 px-4 py-2.5 text-base font-medium shadow-lg"
-
-// MapLibre looks for its worker next to its own module, which Vite moves; give it the worker's real address.
-maplibregl.setWorkerUrl(maplibreWorkerUrl)
-// pmtiles:// sources read the tile archives with range requests.
-maplibregl.addProtocol("pmtiles", new Protocol().tile)
 
 /** What the map draws for one area: the backend's shade, and on the sales map the newest sale's age. */
 type Shade = { level: number; age?: number }
@@ -598,7 +583,7 @@ type MapView = { zoom: number; bbox: string | null; level: "pc5" | "pc6" }
 const LEVELS: Level[] = ["pc4", "pc5", "pc6"]
 
 /**
- * The MapLibre map. All three levels are vector tiles from TILES_URL, coloured by feature state, so new numbers
+ * The MapLibre map. All three levels are vector tiles (map-setup's TILES_URL), coloured by feature state, so new numbers
  * never reload an outline. MapLibre keeps only the tiles near the view in memory.
  */
 function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onView, onDrawing }: MapProps) {
@@ -616,9 +601,6 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
 
   useEffect(() => {
     if (!container.current) return
-    const attribution = "Postcodegebieden: CBS, Esri Nederland"
-    const tiles = (level: Level) =>
-      ({ type: "vector", url: `pmtiles://${TILES_URL}/${level}.pmtiles`, promoteId: "postcode", attribution }) as const
     const map = new maplibregl.Map({
       container: container.current,
       center: [5.3, 52.15],
@@ -632,13 +614,7 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
       style: {
         version: 8,
         sources: {
-          background: {
-            type: "raster",
-            tiles: ["https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/grijs/EPSG:3857/{z}/{x}/{y}.png"],
-            tileSize: 256,
-            maxzoom: 19,
-            attribution: "Achtergrond: PDOK, Kadaster",
-          },
+          background: BACKGROUND_SOURCE,
           // The same map's names alone, on a transparent background, drawn again over the coloured areas so a street
           // stays readable under the darkest shade.
           labels: {
@@ -647,9 +623,9 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
             tileSize: 256,
             maxzoom: 19,
           },
-          pc4: tiles("pc4"),
-          pc5: tiles("pc5"),
-          pc6: tiles("pc6"),
+          pc4: postcodeSource("pc4"),
+          pc5: postcodeSource("pc5"),
+          pc6: postcodeSource("pc6"),
         },
         layers: [
           { id: "background", type: "raster", source: "background" },
