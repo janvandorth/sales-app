@@ -1,36 +1,51 @@
+import type { z } from "zod"
 import { requireUser } from "../_shared/auth.ts"
 import { mapUrl } from "../_shared/contracts-api.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
-import { salesMapRequestSchema, salesMapSchema, type SalesMap } from "../_shared/sales-map.ts"
+import { salesMapRequestSchema, salesMapSchema, salesPc6Schema } from "../_shared/sales-map.ts"
 import { demoSalesMap } from "../_shared/sales-map-demo.ts"
-import { salesMapView, type SalesMapResponse } from "../_shared/sales-map-view.ts"
+import { salesMapView, salesStreetsView, type SalesMapResponse } from "../_shared/sales-map-view.ts"
 
-// Where the team sold, per PC4, for the map, from ZMAdmin via the Contracts API (GET .../Sales/2026.1/Map).
-// Everyone sees the whole team's areas and when the newest sale there was; only admins also get how many sales
-// and by whom. The counts are left out here, not in the app, so a recruiter's phone never receives them.
-// Without STATS_API_KEY the areas are made up (demo mode).
+// Where the team sold, for the map, from ZMAdmin via the Contracts API: per PC4 (GET .../Sales/2026.1/Map), or
+// zoomed in the streets in the map's view (.../Map/Pc6). Everyone sees the whole team's areas, when the newest sale
+// there was and a shade for how much; only admins also get how many sales and by whom. The counts are left out
+// here, not in the app, so a recruiter's phone never receives them.
+// Without STATS_API_KEY the areas are made up (demo mode; no street outlines then).
 
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
   const parsed = salesMapRequestSchema.safeParse(await req.json())
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? "Ongeldig verzoek")
-  const { from, to } = parsed.data
+  const { from, to, bbox } = parsed.data
   if (from > to) throw new HttpError(400, "Ongeldige periode")
 
   const { data: profile, error } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
   if (error || !profile) throw new HttpError(403, "Geen profiel gevonden")
+  const detailed = profile.is_admin === true
 
   const key = optionalEnv("STATS_API_KEY")
-  const map = key ? await fetchMap(mapUrl(), key, from, to) : demoSalesMap(from, to)
-  const response: SalesMapResponse = { demo: !key, map: salesMapView(map, profile.is_admin === true, from, to) }
+  let response: SalesMapResponse
+  if (bbox) {
+    const pc6 = key
+      ? await fetchFromApi(`${mapUrl()}/Pc6`, key, { from, to, bbox }, salesPc6Schema)
+      : { streetThresholds: [], streets: [] }
+    response = { demo: !key, streets: salesStreetsView(pc6, detailed, from, to) }
+  } else {
+    const map = key ? await fetchFromApi(mapUrl(), key, { from, to }, salesMapSchema) : demoSalesMap(from, to)
+    response = { demo: !key, map: salesMapView(map, detailed, from, to) }
+  }
   return json(response)
 })
 
-async function fetchMap(endpoint: string, key: string, from: string, to: string): Promise<SalesMap> {
+async function fetchFromApi<T>(
+  endpoint: string,
+  key: string,
+  query: Record<string, string>,
+  schema: z.ZodType<T>,
+): Promise<T> {
   const url = new URL(endpoint)
-  url.searchParams.set("from", from)
-  url.searchParams.set("to", to)
+  for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value)
 
   const response = await fetch(url, {
     headers: { "X-API-Key": key, Accept: "application/json" },
@@ -51,7 +66,7 @@ async function fetchMap(endpoint: string, key: string, from: string, to: string)
   } catch {
     // Reported below.
   }
-  const parsed = salesMapSchema.safeParse(body)
+  const parsed = schema.safeParse(body)
   if (!parsed.success) {
     console.error("Unexpected answer from the map endpoint", parsed.error.issues)
     throw new HttpError(502, "Onverwacht antwoord van de kaart")

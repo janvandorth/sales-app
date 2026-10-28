@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import * as maplibregl from "maplibre-gl"
-import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl"
+import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
 import { ArrowLeftIcon, RefreshCwIcon } from "lucide-react"
@@ -11,10 +11,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getSalesMap, getSalesOpportunities } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
-import type { MapArea } from "@shared/sales-map-view"
-import type { OpportunitiesView, OpportunityArea, WozBand } from "@shared/sales-opportunities"
+import type { MapArea, SalesStreet, StreetsView } from "@shared/sales-map-view"
+import type { OpportunitiesView, OpportunityArea, OpportunityStreet, WozBand } from "@shared/sales-opportunities"
 import { addDays, formatDay, today } from "../dashboard/periods"
-import { AGE_STOPS, ageColorExpression, OPPORTUNITY_COLOR, strength } from "./scale"
+import { AGE_STOPS, fillColor, fillOpacity, KANSEN_COLORS } from "./scale"
 
 type Props = { onBack: () => void }
 type Mode = "sales" | "kansen"
@@ -27,7 +27,11 @@ const PERIODS = [
 
 /** public/nl-pc4.geojson from scripts/build-pc4-areas.mjs, with the PC4 code in `postcode`. */
 const PC4_AREAS_URL = "/nl-pc4.geojson"
-const SOURCE = "pc4"
+
+/** From this zoom the streets (PC6) in view are drawn instead of the PC4 areas. */
+const STREET_ZOOM = 14
+
+const EMPTY: StreetsView<never>["features"] = { type: "FeatureCollection", features: [] }
 
 // MapLibre looks for its worker next to its own module, which Vite moves; give it the worker's real address.
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
@@ -36,53 +40,94 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
 type Shade = { level: number; age?: number }
 
 /**
- * Two views of the PC4 areas, everything computed by the backend. "Verkopen": where the team sold, red where the
- * newest sale is days old fading to grey, darker where more was sold. "Kansen": where households in streets of a
- * WOZ band are still not a customer, in blue, darker where more are open; tapping an area lists its best streets.
- * Everyone sees the whole team; only admins also get the numbers, which the backend leaves out for recruiters.
+ * Two views of the areas, everything computed by the backend. "Verkopen": where the team sold, red where the newest
+ * sale is days old fading to grey, darker where more was sold. "Kansen": where households in streets of a WOZ band
+ * are still not a customer, pale to deep blue. A PC4 is shaded like its best street; zoomed in, the streets in view
+ * are drawn by themselves on the same scale. Only admins also get the numbers, which the backend leaves out for
+ * recruiters.
  */
 export function SalesMapPage({ onBack }: Props) {
   const [mode, setMode] = useState<Mode>("sales")
   const [periodDays, setPeriodDays] = useState<number>(90)
   const [woz, setWoz] = useState<WozBand>("low")
+  /** The view's box when zoomed in to streets, else null. */
+  const [bbox, setBbox] = useState<string | null>(null)
   const until = today()
   const from = addDays(until, -(periodDays - 1))
 
   const sales = useQuery({
     queryKey: ["sales-map", from, until],
-    queryFn: () => getSalesMap({ from, to: until }),
+    queryFn: async () => {
+      const response = await getSalesMap({ from, to: until })
+      if (!("map" in response)) throw new Error("Onverwacht antwoord")
+      return response
+    },
     placeholderData: keepPreviousData,
     enabled: mode === "sales",
+  })
+  const salesStreets = useQuery({
+    queryKey: ["sales-map-streets", from, until, bbox],
+    queryFn: async () => {
+      const response = await getSalesMap({ from, to: until, bbox: bbox! })
+      return "streets" in response ? response.streets : undefined
+    },
+    placeholderData: keepPreviousData,
+    enabled: mode === "sales" && bbox !== null,
   })
   const kansen = useQuery({
     queryKey: ["sales-opportunities", woz],
     queryFn: async () => {
       const response = await getSalesOpportunities({ action: "areas", woz })
       if (response.action !== "areas") throw new Error("Onverwacht antwoord")
-      return { demo: response.demo, view: response.view }
+      return response
     },
     placeholderData: keepPreviousData,
     enabled: mode === "kansen",
     // Customers are counted once a night; no need to ask again while the page is open.
     staleTime: 15 * 60_000,
   })
+  const kansenStreets = useQuery({
+    queryKey: ["sales-opportunities-streets", woz, bbox],
+    queryFn: async () => {
+      const response = await getSalesOpportunities({ action: "pc6", woz, bbox: bbox! })
+      return response.action === "pc6" ? response.view : undefined
+    },
+    placeholderData: keepPreviousData,
+    enabled: mode === "kansen" && bbox !== null,
+    staleTime: 15 * 60_000,
+  })
+
   const query = mode === "sales" ? sales : kansen
   const salesMap = sales.data?.map
   const opportunities = kansen.data?.view
+  const streets: StreetsView<SalesStreet | OpportunityStreet> | undefined =
+    bbox === null ? undefined : mode === "sales" ? salesStreets.data : kansenStreets.data
 
   const salesAreas = useMemo(() => new Map(salesMap?.areas.map((a) => [a.postcode, a]) ?? []), [salesMap])
   const kansenAreas = useMemo(() => new Map(opportunities?.areas.map((a) => [a.postcode, a]) ?? []), [opportunities])
   const names = useMemo(() => new Map(salesMap?.recruiters.map((r) => [r.number, r.name]) ?? []), [salesMap])
   const shades: Map<string, Shade> = mode === "sales" ? salesAreas : kansenAreas
 
-  // Read when an area is tapped; kept current without recreating the map.
-  const popup = useRef<(postcode: string) => HTMLElement>(() => document.createElement("div"))
+  // Read when the map is tapped; kept current without recreating the map.
+  const popup = useRef<PopupFor>({ area: () => document.createElement("div"), street: () => null })
   useEffect(() => {
-    popup.current =
-      mode === "sales"
-        ? (postcode) => salesPopup(postcode, salesAreas.get(postcode), names)
-        : (postcode) => kansenPopup(postcode, kansenAreas.get(postcode), woz)
-  }, [mode, salesAreas, kansenAreas, names, woz])
+    const byPostcode = new Map((streets?.streets ?? []).map((s) => [s.postcode, s]))
+    const levels = new Map((streets?.features.features ?? []).map((f) => [f.properties.postcode, f.properties.level]))
+    popup.current = {
+      area:
+        mode === "sales"
+          ? (postcode) => salesPopup(postcode, salesAreas.get(postcode), names)
+          : (postcode) => kansenPopup(postcode, kansenAreas.get(postcode), woz),
+      street: (postcode) => {
+        const street = byPostcode.get(postcode)
+        if (!street) return null
+        const level = levels.get(postcode) ?? 1
+        return mode === "sales"
+          ? salesStreetPopup(street as SalesStreet, level, names)
+          : kansenStreetPopup(street as OpportunityStreet, level)
+      },
+    }
+  }, [mode, salesAreas, kansenAreas, names, woz, streets])
 
   return (
     <div className="flex h-svh flex-col bg-muted">
@@ -147,7 +192,7 @@ export function SalesMapPage({ onBack }: Props) {
         </Alert>
       )}
 
-      <SalesMap mode={mode} shades={shades} popup={popup} />
+      <SalesMap mode={mode} shades={shades} streets={streets} popup={popup} onStreetView={setBbox} />
 
       {mode === "sales" && salesMap?.detailed && (
         <p className="border-t bg-background px-4 py-1.5 text-xs text-muted-foreground">
@@ -159,20 +204,37 @@ export function SalesMapPage({ onBack }: Props) {
       {mode === "kansen" && opportunities && (
         <p className="border-t bg-background px-4 py-1.5 text-xs text-muted-foreground">
           {opportunities.detailed && `${totalOpen(opportunities)} huishoudens nog geen klant op de kaart. `}
-          Huishoudens en WOZ per straat: {opportunities.statistics}. Tik op een gebied voor de beste straten.
+          Huishoudens en WOZ per straat: {opportunities.statistics}. Een gebied is zo donker als zijn beste straat; zoom
+          in voor de straten.
         </p>
       )}
     </div>
   )
 }
 
-type MapProps = { mode: Mode; shades: Map<string, Shade>; popup: { current: (postcode: string) => HTMLElement } }
+type PopupFor = { area: (postcode: string) => HTMLElement; street: (postcode: string) => HTMLElement | null }
 
-/** The MapLibre map; shades are set as feature state, so new numbers never reload the areas. */
-function SalesMap({ mode, shades, popup }: MapProps) {
+type MapProps = {
+  mode: Mode
+  shades: Map<string, Shade>
+  streets: StreetsView<unknown> | undefined
+  popup: { current: PopupFor }
+  /** Called with the view's box once zoomed in to streets, and with null when zoomed out again. */
+  onStreetView: (bbox: string | null) => void
+}
+
+/**
+ * The MapLibre map. PC4 shades are set as feature state, so new numbers never reload the areas; from STREET_ZOOM the
+ * areas fade out and the backend's street outlines for the view take over.
+ */
+function SalesMap({ mode, shades, streets, popup, onStreetView }: MapProps) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
+  const viewChanged = useRef(onStreetView)
   const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    viewChanged.current = onStreetView
+  }, [onStreetView])
 
   useEffect(() => {
     if (!container.current) return
@@ -197,29 +259,30 @@ function SalesMap({ mode, shades, popup }: MapProps) {
             maxzoom: 19,
             attribution: "Achtergrond: PDOK, Kadaster",
           },
-          [SOURCE]: {
+          pc4: {
             type: "geojson",
             data: PC4_AREAS_URL,
             promoteId: "postcode",
             attribution: "Postcodegebieden en huishoudens: CBS, Esri Nederland",
           },
+          pc6: { type: "geojson", data: EMPTY, promoteId: "postcode" },
         },
         layers: [
           { id: "background", type: "raster", source: "background" },
-          {
-            id: "pc4-fill",
-            type: "fill",
-            source: SOURCE,
-            paint: {
-              "fill-color": ageColorExpression(),
-              "fill-opacity": ["case", shaded, ["feature-state", "strength"], 0],
-            },
-          },
+          { id: "pc4-fill", type: "fill", source: "pc4", paint: pc4Paint("sales", shaded) },
           {
             id: "pc4-line",
             type: "line",
-            source: SOURCE,
+            source: "pc4",
             paint: { "line-color": "#334155", "line-width": 0.5, "line-opacity": ["case", shaded, 0.6, 0.15] },
+          },
+          { id: "pc6-fill", type: "fill", source: "pc6", minzoom: STREET_ZOOM - 0.5, paint: pc6Paint("sales") },
+          {
+            id: "pc6-line",
+            type: "line",
+            source: "pc6",
+            minzoom: STREET_ZOOM - 0.5,
+            paint: { "line-color": "#334155", "line-width": 0.4, "line-opacity": 0.5 },
           },
         ],
       },
@@ -227,13 +290,28 @@ function SalesMap({ mode, shades, popup }: MapProps) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
     map.on("load", () => setLoaded(true))
 
+    // Zoomed in, tell the page which streets to ask for; a moment after the map stops, not on every frame.
+    let wait: ReturnType<typeof setTimeout> | undefined
+    map.on("moveend", () => {
+      clearTimeout(wait)
+      wait = setTimeout(() => {
+        if (map.getZoom() < STREET_ZOOM) return viewChanged.current(null)
+        const b = map.getBounds()
+        viewChanged.current([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(3)).join(","))
+      }, 400)
+    })
+
     const info = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
-    map.on("click", "pc4-fill", (event) => {
-      const id = event.features?.[0]?.id
-      if (id === undefined) return
+    map.on("click", (event) => {
+      const [street] =
+        map.getZoom() >= STREET_ZOOM ? map.queryRenderedFeatures(event.point, { layers: ["pc6-fill"] }) : []
+      const content = street?.id !== undefined ? popup.current.street(String(street.id)) : null
+      if (content) return void info.setLngLat(event.lngLat).setDOMContent(content).addTo(map)
+      const [area] = map.queryRenderedFeatures(event.point, { layers: ["pc4-fill"] })
+      if (area?.id === undefined) return void info.remove()
       info
         .setLngLat(event.lngLat)
-        .setDOMContent(popup.current(String(id)))
+        .setDOMContent(popup.current.area(String(area.id)))
         .addTo(map)
     })
     map.on("mouseenter", "pc4-fill", () => (map.getCanvas().style.cursor = "pointer"))
@@ -241,29 +319,68 @@ function SalesMap({ mode, shades, popup }: MapProps) {
 
     mapRef.current = map
     return () => {
+      clearTimeout(wait)
       info.remove()
       map.remove()
       mapRef.current = null
     }
   }, [popup])
 
-  // Shade every area the backend sent; the others stay transparent. Blue on "kansen", by age on the sales map.
+  // Shade every area the backend sent; the others stay transparent.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
-    map.setPaintProperty("pc4-fill", "fill-color", mode === "sales" ? ageColorExpression() : OPPORTUNITY_COLOR)
-    map.removeFeatureState({ source: SOURCE })
+    const shaded: ExpressionSpecification = ["boolean", ["feature-state", "shaded"], false]
+    const pc4 = pc4Paint(mode, shaded)
+    const pc6 = pc6Paint(mode)
+    map.setPaintProperty("pc4-fill", "fill-color", pc4["fill-color"])
+    map.setPaintProperty("pc4-fill", "fill-opacity", pc4["fill-opacity"])
+    map.setPaintProperty("pc6-fill", "fill-color", pc6["fill-color"])
+    map.setPaintProperty("pc6-fill", "fill-opacity", pc6["fill-opacity"])
+    map.removeFeatureState({ source: "pc4" })
     for (const [postcode, shade] of shades) {
-      map.setFeatureState(
-        { source: SOURCE, id: postcode },
-        { shaded: true, age: shade.age ?? 1, strength: strength(shade.level) },
-      )
+      map.setFeatureState({ source: "pc4", id: postcode }, { shaded: true, level: shade.level, age: shade.age ?? 1 })
     }
   }, [mode, shades, loaded])
+
+  // The streets of the view, or none when zoomed out.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loaded) return
+    ;(map.getSource("pc6") as GeoJSONSource).setData((streets?.features ?? EMPTY) as never)
+  }, [streets, loaded])
 
   // The container itself fills the space: MapLibre's stylesheet makes it position: relative, so absolute won't hold.
   return <div ref={container} className="min-h-0 flex-1" />
 }
+
+type FillPaint = { "fill-color": ExpressionSpecification; "fill-opacity": ExpressionSpecification }
+
+/** PC4 areas by feature state, fading out where the streets take over. */
+function pc4Paint(mode: Mode, shaded: ExpressionSpecification): FillPaint {
+  const level: ExpressionSpecification = ["feature-state", "level"]
+  const opacity: ExpressionSpecification = ["case", shaded, fillOpacity(mode, level), 0]
+  return {
+    "fill-color": fillColor(mode, level, ["feature-state", "age"]),
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], STREET_ZOOM - 0.5, opacity, STREET_ZOOM, 0],
+  }
+}
+
+/** Streets by the properties the backend put on them. */
+function pc6Paint(mode: Mode): FillPaint {
+  const level: ExpressionSpecification = ["get", "level"]
+  return { "fill-color": fillColor(mode, level, ["get", "age"]), "fill-opacity": fillOpacity(mode, level) }
+}
+
+/** A level as words, so a recruiter sees how a street ranks without a number. */
+const RANKS = [
+  "",
+  "Gewoon",
+  "Boven het midden",
+  "Top 25% van de straten",
+  "Top 10% van de straten",
+  "Top 3% van de straten",
+]
 
 /** A popup's root and a helper adding text nodes, never HTML, so names from ZMAdmin are never read as markup. */
 function popupRoot(): [
@@ -282,6 +399,8 @@ function popupRoot(): [
   return [root, add]
 }
 
+const pc6Label = (postcode: string) => `${postcode.slice(0, 4)} ${postcode.slice(4)}`
+
 function salesPopup(postcode: string, area: MapArea | undefined, names: Map<string, string>): HTMLElement {
   const [root, add] = popupRoot()
   add("div", `${postcode}${area?.city ? ` · ${area.city}` : ""}`, "font-semibold")
@@ -289,13 +408,27 @@ function salesPopup(postcode: string, area: MapArea | undefined, names: Map<stri
     add("div", "Geen verkopen in deze periode", "text-muted-foreground")
     return root
   }
-  if (area.sold === undefined) {
-    add("div", `Laatste verkoop op ${formatDay(area.lastSoldOn)}`)
-    return root
+  add("div", `Laatste verkoop op ${formatDay(area.lastSoldOn)}`)
+  add("div", `Drukste straat: ${RANKS[area.level].toLowerCase()}`, "text-muted-foreground")
+  if (area.sold !== undefined) {
+    add("div", `${area.sold} ${area.sold === 1 ? "verkoop" : "verkopen"}, drukste straat ${area.bestStreetSold}`)
+    const list = add("ul", "", "pt-1")
+    for (const r of area.recruiters ?? []) add("li", `${names.get(r.recruiter) ?? r.recruiter}: ${r.sold}`, "", list)
   }
-  add("div", `${area.sold} ${area.sold === 1 ? "verkoop" : "verkopen"}, laatste op ${formatDay(area.lastSoldOn)}`)
-  const list = add("ul", "", "pt-1")
-  for (const r of area.recruiters ?? []) add("li", `${names.get(r.recruiter) ?? r.recruiter}: ${r.sold}`, "", list)
+  add("div", "Zoom in om de straten te zien", "pt-1 text-xs text-muted-foreground")
+  return root
+}
+
+function salesStreetPopup(street: SalesStreet, level: number, names: Map<string, string>): HTMLElement {
+  const [root, add] = popupRoot()
+  add("div", `${pc6Label(street.postcode)}${street.city ? ` · ${street.city}` : ""}`, "font-semibold")
+  add("div", `Laatste verkoop op ${formatDay(street.lastSoldOn)}`)
+  add("div", RANKS[level], "text-muted-foreground")
+  if (street.sold !== undefined) {
+    add("div", `${street.sold} ${street.sold === 1 ? "verkoop" : "verkopen"}`)
+    const list = add("ul", "", "pt-1")
+    for (const r of street.recruiters ?? []) add("li", `${names.get(r.recruiter) ?? r.recruiter}: ${r.sold}`, "", list)
+  }
   return root
 }
 
@@ -307,8 +440,10 @@ function kansenPopup(postcode: string, area: OpportunityArea | undefined, woz: W
     add("div", "Hier zijn in deze WOZ-groep geen huishoudens meer te winnen", "text-muted-foreground")
     return root
   }
+  add("div", `Beste straat: ${RANKS[area.level].toLowerCase()}`, "text-muted-foreground")
   if (area.open !== undefined && area.households !== undefined && area.share !== undefined) {
     add("div", `${nl(area.open)} van ${nl(area.households)} huishoudens nog geen klant (${percent(area.share)} klant)`)
+    add("div", `Beste straat: ${nl(area.bestStreetOpen ?? 0)} nog geen klant`)
   }
   const status = add("div", "Beste straten laden…", "pt-1 text-muted-foreground")
   void getSalesOpportunities({ action: "streets", pc4: postcode, woz })
@@ -318,7 +453,7 @@ function kansenPopup(postcode: string, area: OpportunityArea | undefined, woz: W
       status.className = "pt-1 font-medium"
       const list = add("ol", "", "list-decimal pl-5")
       for (const s of response.view.streets) {
-        const where = `${s.streets || "Onbekende straat"} (${s.postcode.slice(0, 4)} ${s.postcode.slice(4)})`
+        const where = `${s.streets || "Onbekende straat"} (${pc6Label(s.postcode)})`
         const numbers = s.open !== undefined ? ` · ${s.open} open${s.woz ? ` · WOZ €${s.woz}k` : ""}` : ""
         add("li", where + numbers, "", list)
       }
@@ -327,6 +462,17 @@ function kansenPopup(postcode: string, area: OpportunityArea | undefined, woz: W
       status.textContent = getErrorMessage(error)
       status.className = "pt-1 text-destructive"
     })
+  return root
+}
+
+function kansenStreetPopup(street: OpportunityStreet, level: number): HTMLElement {
+  const [root, add] = popupRoot()
+  add("div", pc6Label(street.postcode), "font-semibold")
+  add("div", RANKS[level])
+  if (street.open !== undefined && street.households !== undefined) {
+    add("div", `${street.open} van ${street.households} huishoudens nog geen klant`)
+    if (street.woz) add("div", `Gemiddelde WOZ €${street.woz}k`, "text-muted-foreground")
+  }
   return root
 }
 
@@ -384,9 +530,9 @@ function SalesLegend({ periodDays }: { periodDays: number }) {
         <span>{periodDays} dagen geleden</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-sm bg-red-600/25" />
-        <span className="h-2.5 w-2.5 rounded-sm bg-red-600/85" />
-        <span>donkerder = meer verkopen</span>
+        <span className="h-2.5 w-2.5 rounded-sm bg-red-600/30" />
+        <span className="h-2.5 w-2.5 rounded-sm bg-red-600/90" />
+        <span>donkerder = drukkere straat</span>
       </div>
     </div>
   )
@@ -395,9 +541,10 @@ function SalesLegend({ periodDays }: { periodDays: number }) {
 function KansenLegend() {
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span className="h-2.5 w-2.5 rounded-sm bg-blue-700/25" />
-      <span className="h-2.5 w-2.5 rounded-sm bg-blue-700/85" />
-      <span>donkerder = meer huishoudens nog geen klant</span>
+      {KANSEN_COLORS.map((color) => (
+        <span key={color} className="h-2.5 w-3.5 rounded-sm" style={{ background: color }} />
+      ))}
+      <span>gewoon → top 3% van de straten, naar huishoudens nog geen klant</span>
     </div>
   )
 }

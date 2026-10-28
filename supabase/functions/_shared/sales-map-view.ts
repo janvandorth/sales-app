@@ -1,12 +1,15 @@
-// What the map shows, made by the sales-map function from the Contracts API's sales per PC6. Everyone sees where
-// and how recently the team sold, and how much as one of LEVELS shades. Only admins get the numbers: for recruiters
-// no count of any kind leaves the server, not per area, not per recruiter, not in total. No Deno APIs here.
-import type { SalesMap } from "./sales-map.ts"
+// What the map shows, made by the sales-map function from the Contracts API's sales per street (PC6). Everyone sees
+// where and how recently the team sold, and how much as one of LEVELS shades. Only admins get the numbers: for
+// recruiters no count of any kind leaves the server, not per area, not per recruiter, not in total.
+// A PC4 area is shaded by its busiest street, ranked against the busiest streets of all other areas, so a dark area
+// is one with a street worth zooming in to, however big or small the area is. Zoomed in, each street is ranked among
+// all streets. No Deno APIs here.
+import type { SalesMap, SalesPc6 } from "./sales-map.ts"
 
 /** Shades of "how much": coarse enough that a recruiter cannot work the counts back out. */
 export const LEVELS = 5
 
-/** One PC4 area. `sold` and `recruiters` only for admins. */
+/** One PC4 area. The numbers only for admins. */
 export type MapArea = {
   /** "1234". */
   postcode: string
@@ -14,19 +17,18 @@ export type MapArea = {
   lastSoldOn: string
   /** How long ago `lastSoldOn` was as a share of the period: 0 = its last day, 1 = its first day. */
   age: number
-  /** 1 (fewest sales) to LEVELS (as many as the busiest area), on a log scale. */
+  /** 1 to LEVELS: how its busiest street ranks against the busiest streets of the other areas. */
   level: number
   sold?: number
+  /** Sales in its busiest street. */
+  bestStreetSold?: number
   /** Most sales first. */
   recruiters?: { recruiter: string; sold: number }[]
 }
 
-/** The sales-map function's answer. */
-export type SalesMapResponse = {
-  /** True when the Contracts API is not configured and the areas are made up. */
-  demo: boolean
-  map: SalesMapView
-}
+/** The sales-map function's answer: the PC4 areas, or (asked with a view) the streets in it. */
+export type SalesMapResponse =
+  { demo: boolean; map: SalesMapView } | { demo: boolean; streets: StreetsView<SalesStreet> }
 
 export type SalesMapView = {
   /** True when the counts are included (admins). */
@@ -38,6 +40,28 @@ export type SalesMapView = {
   recruiters: { number: string; name: string }[]
 }
 
+/** One street (PC6) of the zoomed-in map. The numbers only for admins. */
+export type SalesStreet = {
+  postcode: string
+  city: string
+  lastSoldOn: string
+  sold?: number
+  recruiters?: { recruiter: string; sold: number }[]
+}
+
+/**
+ * The streets in a view: outlines with what they are drawn by (level, and on the sales map the age) as GeoJSON for
+ * the map, and per street what its popup shows.
+ */
+export type StreetsView<T> = {
+  detailed: boolean
+  features: {
+    type: "FeatureCollection"
+    features: { type: "Feature"; properties: { postcode: string; level: number; age?: number }; geometry: unknown }[]
+  }
+  streets: T[]
+}
+
 type Sum = {
   area: Omit<Required<MapArea>, "level" | "age">
   cities: Map<string, number>
@@ -46,8 +70,8 @@ type Sum = {
 
 /**
  * The PC6 rows summed to PC4: a PC4 area holds the sales of every PC6 that starts with it, its newest sale day and
- * that day's age in the period `from`..`to` (yyyy-MM-dd), the city most of those sales were at, and its level.
- * Without `detailed`, the counts are left out.
+ * that day's age in the period `from`..`to` (yyyy-MM-dd), the city most of those sales were at, and the level of
+ * its busiest street. Without `detailed`, the counts are left out.
  */
 export function salesMapView(map: SalesMap, detailed: boolean, from: string, to: string): SalesMapView {
   const sums = new Map<string, Sum>()
@@ -56,19 +80,20 @@ export function salesMapView(map: SalesMap, detailed: boolean, from: string, to:
     let sum = sums.get(postcode)
     if (!sum) {
       sum = {
-        area: { postcode, city: "", lastSoldOn: pc6.lastSoldOn, sold: 0, recruiters: [] },
+        area: { postcode, city: "", lastSoldOn: pc6.lastSoldOn, sold: 0, bestStreetSold: 0, recruiters: [] },
         cities: new Map(),
         recruiters: new Map(),
       }
       sums.set(postcode, sum)
     }
     sum.area.sold += pc6.sold
+    sum.area.bestStreetSold = Math.max(sum.area.bestStreetSold, pc6.sold)
     if (pc6.lastSoldOn > sum.area.lastSoldOn) sum.area.lastSoldOn = pc6.lastSoldOn
     if (pc6.city) sum.cities.set(pc6.city, (sum.cities.get(pc6.city) ?? 0) + pc6.sold)
     for (const r of pc6.recruiters) sum.recruiters.set(r.recruiter, (sum.recruiters.get(r.recruiter) ?? 0) + r.sold)
   }
 
-  const maxSold = Math.max(0, ...[...sums.values()].map((s) => s.area.sold))
+  const areaThresholds = streetThresholds([...sums.values()].map((s) => s.area.bestStreetSold))
   const areas: MapArea[] = [...sums.values()]
     .map(({ area, cities, recruiters }) => {
       const shown = {
@@ -76,12 +101,13 @@ export function salesMapView(map: SalesMap, detailed: boolean, from: string, to:
         city: mostOf(cities) ?? "",
         lastSoldOn: area.lastSoldOn,
         age: ageIn(area.lastSoldOn, from, to),
-        level: levelOf(area.sold, maxSold),
+        level: levelFrom(area.bestStreetSold, areaThresholds),
       }
       if (!detailed) return shown
       return {
         ...shown,
         sold: area.sold,
+        bestStreetSold: area.bestStreetSold,
         recruiters: [...recruiters]
           .map(([recruiter, sold]) => ({ recruiter, sold }))
           .sort((a, b) => b.sold - a.sold || a.recruiter.localeCompare(b.recruiter)),
@@ -94,13 +120,45 @@ export function salesMapView(map: SalesMap, detailed: boolean, from: string, to:
     : { detailed, areas, recruiters: [] }
 }
 
+/** The streets in a view, each by its own sales on the national street scale. */
+export function salesStreetsView(pc6: SalesPc6, detailed: boolean, from: string, to: string): StreetsView<SalesStreet> {
+  return {
+    detailed,
+    features: {
+      type: "FeatureCollection",
+      features: pc6.streets.map((s) => ({
+        type: "Feature",
+        properties: {
+          postcode: s.postcode,
+          level: levelFrom(s.sold, pc6.streetThresholds),
+          age: ageIn(s.lastSoldOn, from, to),
+        },
+        geometry: s.geometry,
+      })),
+    },
+    streets: pc6.streets.map(({ postcode, city, lastSoldOn, sold, recruiters }) =>
+      detailed ? { postcode, city, lastSoldOn, sold, recruiters } : { postcode, city, lastSoldOn },
+    ),
+  }
+}
+
 /**
- * 1 to LEVELS for `sold` sales when the busiest area has `maxSold`. On a log scale, so one busy area does not push
- * all others into the lightest shade.
+ * 1 to LEVELS for a street's value: 1 up to the national median, then one more for each of the top 25%, 10% and 3%
+ * it is in (`thresholds` from the Contracts API). By rank rather than by size, so the darkest shade marks the few
+ * streets that really stand out.
  */
-export function levelOf(sold: number, maxSold: number): number {
-  if (maxSold <= 1) return LEVELS
-  return 1 + Math.round(((LEVELS - 1) * Math.log(sold)) / Math.log(maxSold))
+export function levelFrom(value: number, thresholds: readonly number[]): number {
+  return Math.min(LEVELS, 1 + thresholds.filter((t) => value > t).length)
+}
+
+/**
+ * The values at the 50th, 75th, 90th and 97th percentile of the positive `values` (nearest rank), as the Contracts
+ * API computes them; for the demo data, which has no API.
+ */
+export function streetThresholds(values: readonly number[]): number[] {
+  const sorted = values.filter((v) => v > 0).sort((a, b) => a - b)
+  if (sorted.length === 0) return []
+  return [50, 75, 90, 97].map((p) => sorted[Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)])
 }
 
 /** How long before `to` the day `date` is, as a share of the period `from`..`to`, between 0 and 1. */

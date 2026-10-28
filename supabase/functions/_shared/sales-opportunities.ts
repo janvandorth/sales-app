@@ -1,10 +1,12 @@
 // Shared between the sales-opportunities edge function and the web app: where households are still "for grabs",
-// from the Contracts API (GET .../Sales/2026.1/Opportunities and .../Opportunities/{pc4}). The API counts per street
-// (PC6): CBS households minus our active customers, for the streets of a WOZ band, and adds them up per PC4. This
-// file turns that into what the map shows: a shade per PC4 for everyone, the numbers for admins only.
-// No Deno APIs here.
+// from the Contracts API (GET .../Sales/2026.1/Opportunities, .../Opportunities/{pc4} and .../Opportunities/Pc6).
+// The API counts per street (PC6): CBS households minus our active customers, for the streets of a WOZ band. A PC4
+// is shaded by its best street, ranked against the best streets of all other areas, so a dark area is one with a
+// street worth zooming in to; zoomed in, each street is ranked among all streets. Everyone gets the shades; the
+// numbers only admins. No Deno APIs here.
 import { z } from "zod"
-import { levelOf } from "./sales-map-view.ts"
+import { bboxSchema } from "./sales-map.ts"
+import { levelFrom, streetThresholds, type StreetsView } from "./sales-map-view.ts"
 
 export const WOZ_BANDS = ["low", "mid", "high", "all"] as const
 export type WozBand = (typeof WOZ_BANDS)[number]
@@ -12,6 +14,7 @@ export type WozBand = (typeof WOZ_BANDS)[number]
 export const salesOpportunitiesRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("areas"), woz: z.enum(WOZ_BANDS) }),
   z.object({ action: z.literal("streets"), woz: z.enum(WOZ_BANDS), pc4: z.string().regex(/^[1-9]\d{3}$/) }),
+  z.object({ action: z.literal("pc6"), woz: z.enum(WOZ_BANDS), bbox: bboxSchema }),
 ])
 
 export type SalesOpportunitiesRequest = z.input<typeof salesOpportunitiesRequestSchema>
@@ -22,43 +25,52 @@ export const opportunityAreasSchema = z.object({
   lowBelow: z.number().int(),
   highFrom: z.number().int(),
   customersCountedAt: z.string().nullable(),
+  /** Open households of a street at the 50th, 75th, 90th and 97th percentile of all streets with any open. */
+  streetThresholds: z.array(z.number().int()),
   areas: z.array(
     z.object({
       postcode: z.string().regex(/^\d{4}$/),
       households: z.number().int(),
       customers: z.number().int(),
       open: z.number().int(),
+      bestStreetOpen: z.number().int(),
     }),
   ),
 })
 
-/** The Contracts API's streets of one PC4, most open households first. */
-export const opportunityStreetsSchema = z.object({
+const street = z.object({
   postcode: z.string(),
-  streets: z.array(
-    z.object({
-      postcode: z.string(),
-      streets: z.string(),
-      city: z.string(),
-      households: z.number().int(),
-      customers: z.number().int(),
-      open: z.number().int(),
-      woz: z.number().int().nullable(),
-    }),
-  ),
+  streets: z.string(),
+  city: z.string(),
+  households: z.number().int(),
+  customers: z.number().int(),
+  open: z.number().int(),
+  woz: z.number().int().nullable(),
+})
+
+/** The Contracts API's streets of one PC4, most open households first. */
+export const opportunityStreetsSchema = z.object({ postcode: z.string(), streets: z.array(street) })
+
+/** The Contracts API's streets in a view, with their outline. */
+export const opportunityPc6Schema = z.object({
+  streetThresholds: z.array(z.number().int()),
+  streets: z.array(street.extend({ geometry: z.record(z.string(), z.unknown()) })),
 })
 
 export type OpportunityAreas = z.infer<typeof opportunityAreasSchema>
 export type OpportunityStreets = z.infer<typeof opportunityStreetsSchema>
+export type OpportunityPc6 = z.infer<typeof opportunityPc6Schema>
 
 /** One PC4 on the map. The numbers only for admins. */
 export type OpportunityArea = {
   postcode: string
-  /** 1 (fewest open households) to LEVELS (as many as the area with the most). */
+  /** 1 to LEVELS: how its best street ranks against the best streets of the other areas. */
   level: number
   households?: number
   customers?: number
   open?: number
+  /** Open households in its best street. */
+  bestStreetOpen?: number
   /** Share of the households that are a customer, 0 to 1. */
   share?: number
 }
@@ -73,11 +85,11 @@ export type OpportunitiesView = {
   areas: OpportunityArea[]
 }
 
-/** One street of a PC4. The numbers only for admins. */
+/** One street. The numbers only for admins; its name only where the API looked it up (the ranked list). */
 export type OpportunityStreet = {
   postcode: string
-  streets: string
-  city: string
+  streets?: string
+  city?: string
   households?: number
   customers?: number
   open?: number
@@ -86,28 +98,27 @@ export type OpportunityStreet = {
 
 export type OpportunityStreetsView = { detailed: boolean; postcode: string; streets: OpportunityStreet[] }
 
-/** The function's answer: areas or streets, as asked. */
+/** The function's answer: areas, the ranked streets of one area, or the streets in a view. */
 export type SalesOpportunitiesResponse =
   | { demo: boolean; action: "areas"; view: OpportunitiesView }
   | { demo: boolean; action: "streets"; view: OpportunityStreetsView }
+  | { demo: boolean; action: "pc6"; view: StreetsView<OpportunityStreet> }
 
-/**
- * Shades by open households, on a log scale up to the area with the most. An area without open households in the
- * band is left out: nothing to win there.
- */
+/** Each area by its best street. An area without open households in the band is left out: nothing to win there. */
 export function opportunitiesView(api: OpportunityAreas, detailed: boolean): OpportunitiesView {
-  const withOpen = api.areas.filter((a) => a.open > 0)
-  const maxOpen = Math.max(0, ...withOpen.map((a) => a.open))
+  const open = api.areas.filter((a) => a.open > 0)
+  const areaThresholds = streetThresholds(open.map((a) => a.bestStreetOpen))
   return {
     detailed,
     lowBelow: api.lowBelow,
     highFrom: api.highFrom,
     statistics: api.statistics,
-    areas: withOpen.map((a) => {
-      const level = levelOf(a.open, maxOpen)
+    areas: open.map((a) => {
+      const level = levelFrom(a.bestStreetOpen, areaThresholds)
       if (!detailed) return { postcode: a.postcode, level }
       const share = a.households > 0 ? Math.min(1, a.customers / a.households) : 0
-      return { postcode: a.postcode, level, households: a.households, customers: a.customers, open: a.open, share }
+      const { households, customers, open, bestStreetOpen } = a
+      return { postcode: a.postcode, level, households, customers, open, bestStreetOpen, share }
     }),
   }
 }
@@ -118,5 +129,23 @@ export function opportunityStreetsView(api: OpportunityStreets, detailed: boolea
     detailed,
     postcode: api.postcode,
     streets: api.streets.map((s) => (detailed ? s : { postcode: s.postcode, streets: s.streets, city: s.city })),
+  }
+}
+
+/** The streets in a view, each by its own open households on the national street scale. */
+export function opportunityPc6View(api: OpportunityPc6, detailed: boolean): StreetsView<OpportunityStreet> {
+  return {
+    detailed,
+    features: {
+      type: "FeatureCollection",
+      features: api.streets.map((s) => ({
+        type: "Feature",
+        properties: { postcode: s.postcode, level: levelFrom(s.open, api.streetThresholds) },
+        geometry: s.geometry,
+      })),
+    },
+    streets: api.streets.map(({ postcode, households, customers, open, woz }) =>
+      detailed ? { postcode, households, customers, open, woz } : { postcode },
+    ),
   }
 }

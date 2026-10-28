@@ -7,16 +7,18 @@ import { demoOpportunityAreas, demoOpportunityStreets } from "../_shared/sales-o
 import {
   opportunitiesView,
   opportunityAreasSchema,
+  opportunityPc6Schema,
+  opportunityPc6View,
   opportunityStreetsSchema,
   opportunityStreetsView,
   salesOpportunitiesRequestSchema,
   type SalesOpportunitiesResponse,
 } from "../_shared/sales-opportunities.ts"
 
-// Where households are still "for grabs" for the map, from the Contracts API: per PC4, or the best streets of one.
-// Everyone sees the shades and the streets; only admins get households, customers and open households. The numbers
-// are left out here, not in the app, so a recruiter's phone never receives them.
-// Without STATS_API_KEY the answers are made up (demo mode).
+// Where households are still "for grabs" for the map, from the Contracts API: per PC4, the ranked streets of one,
+// or (zoomed in) the streets in the map's view. Everyone sees the shades and the streets; only admins get
+// households, customers and open households. The numbers are left out here, not in the app, so a recruiter's phone
+// never receives them. Without STATS_API_KEY the answers are made up (demo mode; no street outlines then).
 
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
@@ -35,18 +37,30 @@ serve(async (req) => {
       ? await fetchFromApi(opportunitiesUrl(), key, request.woz, opportunityAreasSchema)
       : demoOpportunityAreas(request.woz)
     response = { demo: !key, action: "areas", view: opportunitiesView(api, detailed) }
-  } else {
+  } else if (request.action === "streets") {
     const api = key
       ? await fetchFromApi(opportunitiesUrl(request.pc4), key, request.woz, opportunityStreetsSchema)
       : demoOpportunityStreets(request.pc4, request.woz)
     response = { demo: !key, action: "streets", view: opportunityStreetsView(api, detailed) }
+  } else {
+    const api = key
+      ? await fetchFromApi(opportunitiesUrl("Pc6"), key, request.woz, opportunityPc6Schema, request.bbox)
+      : { streetThresholds: [], streets: [] }
+    response = { demo: !key, action: "pc6", view: opportunityPc6View(api, detailed) }
   }
   return json(response)
 })
 
-async function fetchFromApi<T>(endpoint: string, key: string, woz: string, schema: z.ZodType<T>): Promise<T> {
+async function fetchFromApi<T>(
+  endpoint: string,
+  key: string,
+  woz: string,
+  schema: z.ZodType<T>,
+  bbox?: string,
+): Promise<T> {
   const url = new URL(endpoint)
   if (woz !== "all") url.searchParams.set("woz", woz)
+  if (bbox) url.searchParams.set("bbox", bbox)
 
   const response = await fetch(url, {
     headers: { "X-API-Key": key, Accept: "application/json" },

@@ -1,5 +1,6 @@
 // Made-up "kansen" in the shape of the Contracts API, used until the endpoint is configured (and by the app's
 // dev-only demo mode). Deterministic per band. No Deno APIs here.
+import { streetThresholds } from "./sales-map-view.ts"
 import type { OpportunityAreas, OpportunityStreets, WozBand } from "./sales-opportunities.ts"
 
 const PC4S = ["3811", "3812", "3813", "3814", "3815", "3816", "3818", "3821", "3822", "3823", "3824", "3825"]
@@ -8,16 +9,19 @@ const LETTERS = "ABCDEGHJKLMNPRST"
 
 export function demoOpportunityAreas(woz: WozBand): OpportunityAreas {
   const random = mulberry32(hash(woz))
+  const areas = PC4S.map((postcode) => {
+    const households = 200 + Math.floor(random() * 1800)
+    const customers = Math.floor(households * random() * 0.12)
+    const open = households - customers
+    return { postcode, households, customers, open, bestStreetOpen: Math.floor(open * (0.02 + random() * 0.08)) }
+  })
   return {
     statistics: "Voorbeeld",
     lowBelow: 285,
     highFrom: 450,
     customersCountedAt: null,
-    areas: PC4S.map((postcode) => {
-      const households = 200 + Math.floor(random() * 1800)
-      const customers = Math.floor(households * random() * 0.12)
-      return { postcode, households, customers, open: households - customers }
-    }),
+    streetThresholds: streetThresholds(areas.map((a) => a.bestStreetOpen)),
+    areas,
   }
 }
 

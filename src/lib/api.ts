@@ -121,10 +121,15 @@ export async function getKpi(request: KpiRequest): Promise<KpiResponse> {
 export async function getSalesMap(request: SalesMapRequest): Promise<SalesMapResponse> {
   if (import.meta.env.DEV && DEMO_MODE) {
     const { demoSalesMap } = await import("@shared/sales-map-demo")
-    const { salesMapView } = await import("@shared/sales-map-view")
+    const { salesMapView, salesStreetsView } = await import("@shared/sales-map-view")
+    const detailed = DEMO_MODE === "admin"
     await new Promise((resolve) => setTimeout(resolve, 400))
+    // The demo has no street outlines: zoomed in, the areas simply fade out.
+    if (request.bbox) {
+      return { demo: true, streets: salesStreetsView({ streetThresholds: [], streets: [] }, detailed, "", "") }
+    }
     const map = demoSalesMap(request.from, request.to)
-    return { demo: true, map: salesMapView(map, DEMO_MODE === "admin", request.from, request.to) }
+    return { demo: true, map: salesMapView(map, detailed, request.from, request.to) }
   }
   return invoke<SalesMapResponse>("sales-map", { ...request })
 }
@@ -132,16 +137,25 @@ export async function getSalesMap(request: SalesMapRequest): Promise<SalesMapRes
 export async function getSalesOpportunities(request: SalesOpportunitiesRequest): Promise<SalesOpportunitiesResponse> {
   if (import.meta.env.DEV && DEMO_MODE) {
     const demo = await import("@shared/sales-opportunities-demo")
-    const { opportunitiesView, opportunityStreetsView } = await import("@shared/sales-opportunities")
+    const shared = await import("@shared/sales-opportunities")
     const detailed = DEMO_MODE === "admin"
     await new Promise((resolve) => setTimeout(resolve, 300))
-    return request.action === "areas"
-      ? { demo: true, action: "areas", view: opportunitiesView(demo.demoOpportunityAreas(request.woz), detailed) }
-      : {
-          demo: true,
-          action: "streets",
-          view: opportunityStreetsView(demo.demoOpportunityStreets(request.pc4, request.woz), detailed),
-        }
+    if (request.action === "areas") {
+      return {
+        demo: true,
+        action: "areas",
+        view: shared.opportunitiesView(demo.demoOpportunityAreas(request.woz), detailed),
+      }
+    }
+    if (request.action === "streets") {
+      const streets = demo.demoOpportunityStreets(request.pc4, request.woz)
+      return { demo: true, action: "streets", view: shared.opportunityStreetsView(streets, detailed) }
+    }
+    return {
+      demo: true,
+      action: "pc6",
+      view: shared.opportunityPc6View({ streetThresholds: [], streets: [] }, detailed),
+    }
   }
   return invoke<SalesOpportunitiesResponse>("sales-opportunities", { ...request })
 }

@@ -1,16 +1,23 @@
 import { describe, expect, it } from "vitest"
 import { LEVELS } from "@shared/sales-map-view"
-import { STRENGTH_RANGE, strength } from "./scale"
+import { fillColor, fillOpacity, KANSEN_COLORS, KANSEN_OPACITY, SALES_OPACITY } from "./scale"
 
-describe("strength", () => {
-  const [low, high] = STRENGTH_RANGE
-
-  it("runs from the lightest for level 1 to the darkest for the top level", () => {
-    expect(strength(1)).toBe(low)
-    expect(strength(LEVELS)).toBeCloseTo(high, 5)
+describe("shades", () => {
+  it("has a colour and an opacity for every level", () => {
+    expect([KANSEN_COLORS, KANSEN_OPACITY, SALES_OPACITY].map((list) => list.length)).toEqual([LEVELS, LEVELS, LEVELS])
   })
 
-  it("spreads the levels in even steps", () => {
-    expect(strength(3)).toBeCloseTo((low + high) / 2, 5)
+  it("gets darker with every level", () => {
+    for (const list of [KANSEN_OPACITY, SALES_OPACITY]) {
+      expect([...list].sort((a, b) => a - b)).toEqual(list)
+    }
+  })
+
+  it("draws kansen by level and the sales map by age", () => {
+    const level = ["get", "level"] as never
+    const age = ["get", "age"] as never
+    expect(fillColor("kansen", level, age)[0]).toBe("match")
+    expect(fillColor("sales", level, age)[0]).toBe("interpolate")
+    expect(fillOpacity("kansen", level)).toContain(KANSEN_OPACITY[4])
   })
 })

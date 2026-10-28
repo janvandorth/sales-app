@@ -2,6 +2,7 @@
 // the app's dev-only demo mode). Deterministic: the same period always gives the same areas. The postcodes are
 // real ones around Amersfoort and Utrecht, so they land on the map. No Deno APIs here.
 import type { SalesMap, SalesMapArea } from "./sales-map.ts"
+import { streetThresholds } from "./sales-map-view.ts"
 
 const DEMO_RECRUITERS = [
   { number: "0212BB", name: "Jan van Dorth" },
@@ -89,6 +90,7 @@ export function demoSalesMap(from: string, to: string): SalesMap {
     areas,
     unplaced: Math.floor(areas.length / 25),
     recruiters: DEMO_RECRUITERS.filter((r) => used.has(r.number)).sort((a, b) => a.name.localeCompare(b.name)),
+    streetThresholds: streetThresholds(areas.map((a) => a.sold)),
   }
 }
 
