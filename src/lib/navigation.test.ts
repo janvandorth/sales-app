@@ -8,7 +8,7 @@ const douglas = { wervernr: "2603AP", name: "douglas" }
 describe("page addresses", () => {
   it("gives every page its own path", () => {
     expect(urlOf({ view: "form" })).toBe("/")
-    expect(urlOf({ view: "planning" })).toBe("/planning")
+    expect(urlOf({ view: "planning" })).toBe("/werkgebieden")
     expect(urlOf({ view: "map", map: {} })).toBe("/kaart")
   })
 
@@ -20,7 +20,7 @@ describe("page addresses", () => {
   })
 
   it("opens the page of an address after a reload", () => {
-    expect(pageFromUrl("/planning", "")).toEqual({ view: "planning", viewedAs: undefined })
+    expect(pageFromUrl("/werkgebieden", "")).toEqual({ view: "planning", viewedAs: undefined })
     expect(pageFromUrl("/gebieden/", "?werver=2603AP")).toEqual({
       view: "areas",
       viewedAs: { wervernr: "2603AP", name: "2603AP" },

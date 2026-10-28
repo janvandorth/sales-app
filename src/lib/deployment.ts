@@ -9,7 +9,7 @@ export const TEST_DEPLOYMENT_HEADER = "x-test-deployment"
 /** The results page is still being tried out: only on the test deployment and in development. */
 export const SHOW_RESULTS = IS_TEST_DEPLOYMENT || import.meta.env.DEV
 
-/** Giving out areas ("Planning", "Mijn gebieden", "Toewijzen" on the map) is tried out in the same places. */
+/** Giving out areas ("Werkgebieden", "Mijn gebieden", "Toewijzen" on the map) is tried out in the same places. */
 export const SHOW_AREAS = SHOW_RESULTS
 
 /**
