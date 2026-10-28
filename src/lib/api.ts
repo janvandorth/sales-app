@@ -1,4 +1,5 @@
-// Every call from the app to the backend (Supabase edge functions and storage) goes through this file.
+// Every call from the app to a backend (Supabase edge functions, database and storage; PDOK's address search) goes
+// through this file.
 import {
   FunctionsFetchError,
   FunctionsHttpError,
@@ -13,6 +14,13 @@ import type { SalesMapResponse } from "@shared/sales-map-view"
 import type { SalesOpportunitiesRequest, SalesOpportunitiesResponse } from "@shared/sales-opportunities"
 import { SCANS_BUCKET } from "@shared/storage"
 import type { Recruiter } from "@shared/submission-record"
+import {
+  placeLabel,
+  type AreaAssignment,
+  type AreaMember,
+  type Bounds,
+  type NewAreaAssignment,
+} from "@/features/areas/areas"
 import { IS_TEST_DEPLOYMENT, TEST_DEPLOYMENT_HEADER } from "@/lib/deployment"
 import { ApiError, AuthError, NetworkError } from "@/lib/errors"
 import { supabase } from "@/lib/supabase"
@@ -73,8 +81,12 @@ export function submitForm(values: FormInput) {
   return invoke<{ ok: true; rowId: string; duplicate: boolean }>("submit-form", { ...values })
 }
 
-/** Admins only: the app's recruiters that are not admins, to book a sale on someone else. */
-export function listRecruiters() {
+/** Admins only: the app's recruiters that are not admins, to book a sale on someone else or give an area to. */
+export async function listRecruiters(): Promise<Recruiter[]> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { DEMO_RECRUITERS } = await import("@/features/areas/demo-areas")
+    return DEMO_RECRUITERS
+  }
   return invoke<{ recruiters: Recruiter[] }>("recruiters", {}).then((result) => result.recruiters)
 }
 
@@ -241,6 +253,114 @@ export async function listSales(
     test: row.test,
   }))
   return { sales, total: count ?? sales.length }
+}
+
+// --- Areas --------------------------------------------------------------------------------------
+
+type AreaAssignmentRow = {
+  id: string
+  postcodes: string[]
+  wervernrs: string[]
+  starts_on: string
+  ends_on: string
+  label: string
+  note: string
+  bbox: number[] | null
+  households: number | null
+  open: number | null
+  members: AreaMember[]
+  sold: number
+}
+
+/**
+ * The areas given out that run on any day from..to: all of them for an admin, a werver's own otherwise (the
+ * database function decides), with who works each and what they sold there.
+ */
+export async function listAreaAssignments(from: string, to: string): Promise<AreaAssignment[]> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoAssignments } = await import("@/features/areas/demo-areas")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return demoAssignments(from, to, DEMO_MODE === "werver" ? "0212BB" : null)
+  }
+  const { data, error } = await supabase.rpc("list_area_assignments", { p_from: from, p_to: to })
+  if (error) {
+    if (!navigator.onLine) throw new NetworkError("Geen verbinding met de server")
+    throw new ApiError("De gebieden konden niet worden geladen", 500)
+  }
+  return (data as AreaAssignmentRow[]).map((row) => ({
+    id: row.id,
+    postcodes: row.postcodes,
+    wervernrs: row.wervernrs,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    label: row.label,
+    note: row.note,
+    bounds: row.bbox?.length === 4 ? (row.bbox as Bounds) : null,
+    households: row.households,
+    open: row.open,
+    members: row.members,
+    sold: row.sold,
+  }))
+}
+
+/** Admins only (row-level security): gives out an area. */
+export async function createAreaAssignment(input: NewAreaAssignment): Promise<void> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoCreate } = await import("@/features/areas/demo-areas")
+    return demoCreate(input)
+  }
+  const { error } = await supabase.from("area_assignments").insert({
+    postcodes: input.postcodes,
+    wervernrs: input.wervernrs,
+    starts_on: input.startsOn,
+    ends_on: input.endsOn,
+    label: input.label,
+    note: input.note,
+    bbox: input.bounds,
+    households: input.households,
+    open: input.open,
+  })
+  if (error) {
+    if (!navigator.onLine) throw new NetworkError("Geen verbinding met de server")
+    throw new ApiError("Het gebied kon niet worden toegewezen", 500)
+  }
+}
+
+/** Admins only (row-level security): takes an area back. */
+export async function deleteAreaAssignment(id: string): Promise<void> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoDelete } = await import("@/features/areas/demo-areas")
+    return demoDelete(id)
+  }
+  const { error } = await supabase.from("area_assignments").delete().eq("id", id)
+  if (error) {
+    if (!navigator.onLine) throw new NetworkError("Geen verbinding met de server")
+    throw new ApiError("Het gebied kon niet worden verwijderd", 500)
+  }
+}
+
+/**
+ * The neighbourhood and town at a point, from PDOK's address search (free, no key), e.g. "Overvecht, Utrecht".
+ * Empty when PDOK has no answer; an area is then named by its postcodes.
+ */
+export async function lookupPlace(lon: number, lat: number): Promise<string> {
+  try {
+    const url = new URL("https://api.pdok.nl/bzk/locatieserver/search/v3_1/reverse")
+    url.search = new URLSearchParams({
+      lon: lon.toFixed(5),
+      lat: lat.toFixed(5),
+      type: "adres",
+      rows: "1",
+      fl: "wijknaam,woonplaatsnaam",
+    }).toString()
+    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    if (!response.ok) return ""
+    const body = (await response.json()) as { response?: { docs?: { wijknaam?: string; woonplaatsnaam?: string }[] } }
+    const doc = body.response?.docs?.[0]
+    return placeLabel(doc?.wijknaam, doc?.woonplaatsnaam)
+  } catch {
+    return ""
+  }
 }
 
 // --- Admin ---------------------------------------------------------------------------------------

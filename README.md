@@ -226,9 +226,10 @@ as-is in code so they match the Google Sheet and the back office.
 - **Edge functions:** `supabase functions deploy --use-api --project-ref nrdpixagvynzexwzqtlf`
 - **Database:** add a file to `supabase/migrations/` and apply it (`supabase db push`, or through the Supabase
   dashboard/MCP; keep the file name's version equal to the applied version).
-- **Test deployment:** push to the `test` branch → Vercel preview at
-  `https://sales-app-git-test-jans-projects-71e0b0fc.vercel.app` (shows a "TESTOMGEVING" banner). It uses the same
-  Supabase project. Its build sends an `x-test-deployment` header (and its branch URL is in `TEST_ORIGINS`), so the
+- **Test deployment:** push to the `test` branch → Vercel preview at `https://zm-sales-test.vercel.app` (the
+  branch's own domain) and `https://sales-app-git-test-jans-projects-71e0b0fc.vercel.app` (shows a "TESTOMGEVING"
+  banner). It uses the same Supabase project. Its build sends an `x-test-deployment` header (and both URLs are in
+  `TEST_ORIGINS`), so the
   backend stores its sales with `test = true` whatever URL it is opened on.
   Those are onboarded where `ONBOARDING_TEST_API_ENV` says (unset = test.zekerenmobiel.nl), whatever
   `ONBOARDING_API_ENV` says, and never go to the Google Sheet.
