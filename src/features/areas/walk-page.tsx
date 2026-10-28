@@ -15,6 +15,7 @@ import { HEADER_BUTTON_CLASS, PAGE_WIDTH, PageHeader } from "@/components/page-h
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { useWakeLock } from "@/hooks/use-wake-lock"
 import { areaPostcodes, deleteDoorVisit, listDoorVisits, recordDoorVisit, streetDoors } from "@/lib/api"
 import { getErrorMessage } from "@/lib/errors"
 import { cn } from "@/lib/utils"
@@ -69,6 +70,8 @@ const OUTCOME_STYLES: Record<Outcome | "open", string> = {
  */
 export function WalkPage({ area, wervernr, onBack, onSold, onShowMap }: Props) {
   const position = usePosition()
+  // Between doors the phone would lock itself; walking needs it on the next tap.
+  useWakeLock()
   const places = useQuery({
     queryKey: ["area-postcodes", area.postcodes],
     queryFn: () => areaPostcodes(area.postcodes),
