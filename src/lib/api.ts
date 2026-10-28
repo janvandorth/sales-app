@@ -21,6 +21,14 @@ import {
   type Bounds,
   type NewAreaAssignment,
 } from "@/features/areas/areas"
+import {
+  toevoeging,
+  type Door,
+  type DoorVisit,
+  type Outcome,
+  type PostcodePlace,
+  type Street,
+} from "@/features/areas/doors"
 import { IS_TEST_DEPLOYMENT, TEST_DEPLOYMENT_HEADER } from "@/lib/deployment"
 import { ApiError, AuthError, NetworkError } from "@/lib/errors"
 import { supabase } from "@/lib/supabase"
@@ -270,6 +278,7 @@ type AreaAssignmentRow = {
   open: number | null
   members: AreaMember[]
   sold: number
+  visited: number
 }
 
 /**
@@ -300,6 +309,7 @@ export async function listAreaAssignments(from: string, to: string): Promise<Are
     open: row.open,
     members: row.members,
     sold: row.sold,
+    visited: row.visited,
   }))
 }
 
@@ -361,6 +371,170 @@ export async function lookupPlace(lon: number, lat: number): Promise<string> {
   } catch {
     return ""
   }
+}
+
+// --- Walking an area -----------------------------------------------------------------------------
+
+const PDOK_SEARCH = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free"
+
+/** PDOK returns at most 100 per request; more pages than this means an area too large to walk anyway. */
+const PDOK_PAGE = 100
+const PDOK_MAX_PAGES = 10
+
+/** Every document of a PDOK search, page by page. */
+async function pdokAll<T>(filters: string[], fields: string): Promise<T[]> {
+  const docs: T[] = []
+  for (let page = 0; page < PDOK_MAX_PAGES; page++) {
+    const params = new URLSearchParams({
+      q: "*:*",
+      rows: String(PDOK_PAGE),
+      start: String(page * PDOK_PAGE),
+      fl: fields,
+    })
+    for (const filter of filters) params.append("fq", filter)
+    const response = await fetch(`${PDOK_SEARCH}?${params}`, { signal: AbortSignal.timeout(10_000) }).catch(() => {
+      throw new NetworkError("Geen verbinding met de adressenlijst")
+    })
+    if (!response.ok) throw new ApiError("De adressenlijst gaf geen antwoord", response.status)
+    const body = (await response.json()) as { response: { numFound: number; docs: T[] } }
+    docs.push(...body.response.docs)
+    if (docs.length >= body.response.numFound || body.response.docs.length < PDOK_PAGE) break
+  }
+  return docs
+}
+
+/** "POINT(5.11 52.12)" as [5.11, 52.12]. */
+function point(wkt: string): [number, number] {
+  const [lon, lat] = wkt
+    .replace(/^POINT\(|\)$/g, "")
+    .split(" ")
+    .map(Number)
+  return [lon, lat]
+}
+
+/** The postcodes in an area (codes of any level) with their street and where they lie, from the BAG. */
+export async function areaPostcodes(codes: string[]): Promise<PostcodePlace[]> {
+  type Doc = { postcode: string; straatnaam?: string; woonplaatsnaam?: string; centroide_ll: string }
+  const lists = await Promise.all(
+    codes.map((code) =>
+      pdokAll<Doc>(
+        ["type:postcode", `postcode:${code}${code.length < 6 ? "*" : ""}`],
+        "postcode,straatnaam,woonplaatsnaam,centroide_ll",
+      ),
+    ),
+  )
+  return lists.flat().map((d) => {
+    const [lon, lat] = point(d.centroide_ll)
+    return { postcode: d.postcode, straat: d.straatnaam ?? "", plaats: d.woonplaatsnaam ?? "", lon, lat }
+  })
+}
+
+/** Every address of a street within its postcodes in the area, from the BAG. */
+export async function streetDoors(street: Street): Promise<Door[]> {
+  type Doc = {
+    postcode: string
+    huisnummer: number
+    huisletter?: string
+    huisnummertoevoeging?: string
+    straatnaam: string
+    woonplaatsnaam: string
+  }
+  const quoted = street.name.replace(/(["\\])/g, "\\$1")
+  const docs = await pdokAll<Doc>(
+    ["type:adres", `postcode:(${street.postcodes.join(" OR ")})`, `straatnaam:"${quoted}"`],
+    "postcode,huisnummer,huisletter,huisnummertoevoeging,straatnaam,woonplaatsnaam",
+  )
+  return docs.map((d) => ({
+    postcode: d.postcode,
+    huisnummer: d.huisnummer,
+    toevoeging: toevoeging(d.huisletter, d.huisnummertoevoeging),
+    straat: d.straatnaam,
+    plaats: d.woonplaatsnaam,
+  }))
+}
+
+type DoorVisitRow = {
+  id: string
+  postcode: string
+  huisnummer: number
+  toevoeging: string
+  straat: string
+  outcome: Outcome
+  visited_at: string
+  wervernr: string
+}
+
+/** How far back earlier visits to a door still show. */
+const VISITS_DAYS_BACK = 90
+
+/**
+ * The doors rung in these postcodes in the past three months that the werver may see: their own, and those of
+ * whoever walks the same areas (row-level security decides).
+ */
+export async function listDoorVisits(postcodes: string[]): Promise<DoorVisit[]> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoVisits } = await import("@/features/areas/demo-areas")
+    return demoVisits(postcodes)
+  }
+  const since = new Date(Date.now() - VISITS_DAYS_BACK * 86_400_000).toISOString()
+  const { data, error } = await supabase
+    .from("door_visits")
+    .select("id, postcode, huisnummer, toevoeging, straat, outcome, visited_at, wervernr")
+    .in("postcode", postcodes)
+    .gte("visited_at", since)
+  if (error) {
+    if (!navigator.onLine) throw new NetworkError("Geen verbinding met de server")
+    throw new ApiError("De deuren konden niet worden geladen", 500)
+  }
+  return (data as DoorVisitRow[]).map((row) => ({
+    id: row.id,
+    postcode: row.postcode,
+    huisnummer: row.huisnummer,
+    toevoeging: row.toevoeging,
+    straat: row.straat,
+    plaats: "",
+    outcome: row.outcome,
+    visitedAt: row.visited_at,
+    wervernr: row.wervernr,
+  }))
+}
+
+/** Logs how it went at a door; returns the visit's id, for "Ongedaan". */
+export async function recordDoorVisit(
+  visit: Door & { outcome: Outcome; assignmentId: string; wervernr: string },
+): Promise<string> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoRecordVisit } = await import("@/features/areas/demo-areas")
+    return demoRecordVisit(visit)
+  }
+  const { data, error } = await supabase
+    .from("door_visits")
+    .insert({
+      assignment_id: visit.assignmentId,
+      wervernr: visit.wervernr,
+      postcode: visit.postcode,
+      huisnummer: visit.huisnummer,
+      toevoeging: visit.toevoeging,
+      straat: visit.straat,
+      outcome: visit.outcome,
+    })
+    .select("id")
+    .single()
+  if (error) {
+    if (!navigator.onLine) throw new NetworkError("Geen verbinding: deze deur is niet opgeslagen")
+    throw new ApiError("De deur kon niet worden opgeslagen", 500)
+  }
+  return (data as { id: string }).id
+}
+
+/** Takes back a door logged today. */
+export async function deleteDoorVisit(id: string): Promise<void> {
+  if (import.meta.env.DEV && DEMO_MODE) {
+    const { demoDeleteVisit } = await import("@/features/areas/demo-areas")
+    return demoDeleteVisit(id)
+  }
+  const { error } = await supabase.from("door_visits").delete().eq("id", id)
+  if (error) throw new ApiError("Ongedaan maken lukte niet", 500)
 }
 
 // --- Admin ---------------------------------------------------------------------------------------

@@ -1,10 +1,11 @@
-import { useRef, useState, type ChangeEvent } from "react"
+import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import type { Session } from "@supabase/supabase-js"
 import type { FormInput, FormValues } from "@shared/form-schema"
 import { Spinner } from "@/components/ui/spinner"
+import { doorLabel, type Door } from "@/features/areas/doors"
 import { ChangePasswordDialog } from "@/features/auth/change-password-dialog"
 import { useOnline } from "@/hooks/use-online"
 import { useProfile } from "@/hooks/use-profile"
@@ -17,6 +18,7 @@ import { salesFormSchema } from "./contract-date"
 import { clearDraft } from "./draft-store"
 import { createEmptyForm } from "./form-defaults"
 import { FormHeader } from "./form-header"
+import type { SalesFormApi } from "./form-types"
 import { SalesForm } from "./sales-form"
 import { ScanOverlay } from "./scan-overlay"
 import { useDraft } from "./use-draft"
@@ -28,12 +30,16 @@ type Props = {
   onOpenMap: () => void
   /** The planning for an admin, Mijn gebieden for a werver. */
   onOpenAreas: () => void
+  /** A door marked "Verkocht" while walking: its address goes into the form. */
+  soldAt?: Door | null
+  onSoldAtFilled?: () => void
   onOpenSales: () => void
   onOpenAdmin: () => void
 }
 
 /** Main page after login: header, the sales form, the outbox dialog and the scan overlay. */
-export function FormPage({ session, onOpenDashboard, onOpenMap, onOpenAreas, onOpenSales, onOpenAdmin }: Props) {
+export function FormPage(props: Props) {
+  const { session, onOpenDashboard, onOpenMap, onOpenAreas, onOpenSales, onOpenAdmin, soldAt, onSoldAtFilled } = props
   const userId = session.user.id
   const online = useOnline()
   const profile = useProfile(userId)
@@ -44,6 +50,7 @@ export function FormPage({ session, onOpenDashboard, onOpenMap, onOpenAreas, onO
     mode: "onTouched",
   })
   const { ready } = useDraft(form, userId)
+  useSoldAt(form, ready, soldAt, onSoldAtFilled)
   const scanFill = useScanFill(form, userId)
   const [submitting, setSubmitting] = useState(false)
   const [outboxOpen, setOutboxOpen] = useState(false)
@@ -159,4 +166,26 @@ export function FormPage({ session, onOpenDashboard, onOpenMap, onOpenAreas, onO
       <ScanOverlay phase={scanFill.phase} />
     </div>
   )
+}
+
+/**
+ * Once the draft is back, puts the address of a door marked "Verkocht" into the form: the werver starts at the
+ * customer's details. Whatever else the draft held stays.
+ */
+function useSoldAt(form: SalesFormApi, ready: boolean, door: Door | null | undefined, onFilled?: () => void) {
+  useEffect(() => {
+    if (!ready || !door) return
+    const address = {
+      postcode: door.postcode,
+      huisnummer: String(door.huisnummer),
+      toevoeging: door.toevoeging.replace(/^-/, ""),
+      straat: door.straat,
+      plaats: door.plaats,
+    }
+    for (const [field, value] of Object.entries(address)) {
+      form.setValue(field as keyof typeof address, value, { shouldDirty: true })
+    }
+    toast.success(`Adres ingevuld: ${door.straat} ${doorLabel(door)}`)
+    onFilled?.()
+  }, [form, ready, door, onFilled])
 }

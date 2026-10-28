@@ -1,6 +1,7 @@
 import type { Recruiter } from "@shared/submission-record"
 import { addDays, periodStart, today } from "../dashboard/periods"
 import { runsDuring, type AreaAssignment, type NewAreaAssignment } from "./areas"
+import type { Door, DoorVisit, Outcome } from "./doors"
 
 // Dev only (`?demo`): made-up wervers and areas around Utrecht, kept in memory so giving out an area shows up in
 // the planning until the page reloads. The demo werver is 0212BB, as in the rest of the demo.
@@ -42,6 +43,8 @@ function seed(): AreaAssignment[] {
     open,
     members: wervernrs.map((nr) => ({ wervernr: nr, name: nameOf(nr) })),
     sold,
+    // Walked about as far as sold in: none where nothing was sold yet.
+    visited: sold ? Math.round(open * 2.4 * 0.38) : 0,
   })
   return [
     make(
@@ -119,9 +122,26 @@ export function demoCreate(input: NewAreaAssignment): void {
     id: crypto.randomUUID(),
     members: input.wervernrs.map((nr) => ({ wervernr: nr, name: nameOf(nr) })),
     sold: 0,
+    visited: 0,
   })
 }
 
 export function demoDelete(id: string): void {
   store = (store ?? seed()).filter((a) => a.id !== id)
+}
+
+let visits: DoorVisit[] = []
+
+export function demoVisits(postcodes: string[]): DoorVisit[] {
+  return visits.filter((v) => postcodes.includes(v.postcode))
+}
+
+export function demoRecordVisit(visit: Door & { outcome: Outcome; wervernr: string }): string {
+  const id = crypto.randomUUID()
+  visits.push({ ...visit, id, visitedAt: new Date().toISOString() })
+  return id
+}
+
+export function demoDeleteVisit(id: string): void {
+  visits = visits.filter((v) => v.id !== id)
 }

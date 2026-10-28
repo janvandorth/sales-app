@@ -3,8 +3,10 @@ import { Toaster } from "@/components/ui/sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { AdminPage } from "@/features/admin/admin-page"
 import type { AreaAssignment, AreaMember, AssignStart } from "@/features/areas/areas"
+import type { Door } from "@/features/areas/doors"
 import { MyAreasPage } from "@/features/areas/my-areas-page"
 import { PlanningPage } from "@/features/areas/planning-page"
+import { WalkPage } from "@/features/areas/walk-page"
 import { LoginPage } from "@/features/auth/login-page"
 import { SetPasswordPage } from "@/features/auth/set-password-page"
 import { useSession } from "@/features/auth/use-session"
@@ -18,7 +20,7 @@ import { IS_TEST_DEPLOYMENT } from "@/lib/deployment"
 // Loaded on first use: MapLibre is large and the sales form should not wait for it.
 const SalesMapPage = lazy(() => import("@/features/sales-map/map-page").then((m) => ({ default: m.SalesMapPage })))
 
-type View = "form" | "dashboard" | "map" | "sales" | "admin" | "planning" | "areas"
+type View = "form" | "dashboard" | "map" | "sales" | "admin" | "planning" | "areas" | "walk"
 
 /** How the map opens: plain, giving out an area, or on one area; and where its back button goes. */
 type MapStart = { assign?: AssignStart; focus?: AreaAssignment; back: View; key: number }
@@ -45,6 +47,10 @@ export default function App() {
   const [mapStart, setMapStart] = useState<MapStart>({ back: "form", key: 0 })
   /** The werver whose areas a manager opened from the planning; null for one's own. */
   const [viewedAs, setViewedAs] = useState<AreaMember | null>(null)
+  /** The area being walked door by door. */
+  const [walking, setWalking] = useState<AreaAssignment | null>(null)
+  /** The door marked "Verkocht": the sales form opens with its address filled in. */
+  const [soldAt, setSoldAt] = useState<Door | null>(null)
   const profile = useProfile(session?.user.id)
 
   const openMap = (start: Omit<MapStart, "key">) => {
@@ -90,6 +96,23 @@ export default function App() {
             setViewedAs(null)
           }}
           onShow={(focus) => openMap({ focus, back: "areas" })}
+          onWalk={(area) => {
+            setWalking(area)
+            setView("walk")
+          }}
+        />
+      )
+    }
+    if (view === "walk" && walking) {
+      return (
+        <WalkPage
+          area={walking}
+          wervernr={viewedAs?.wervernr ?? profile?.wervernr}
+          onBack={() => setView("areas")}
+          onSold={(door) => {
+            setSoldAt(door)
+            setView("form")
+          }}
         />
       )
     }
@@ -123,6 +146,8 @@ export default function App() {
         onOpenDashboard={() => setView("dashboard")}
         onOpenMap={() => openMap({ back: "form" })}
         onOpenAreas={() => setView(profile?.isAdmin ? "planning" : "areas")}
+        soldAt={soldAt}
+        onSoldAtFilled={() => setSoldAt(null)}
         onOpenSales={() => setView("sales")}
         onOpenAdmin={() => setView("admin")}
       />

@@ -36,6 +36,7 @@ import {
   runsOn,
   spanLabel,
   tooBig,
+  walkedShare,
   weekday,
   type AreaAssignment,
   type AreaMember,
@@ -206,6 +207,14 @@ function AreaCard({ area, onShow, onViewAs }: AreaCardProps) {
         {area.label && <span className="text-muted-foreground"> · {codesLabel(area.postcodes)}</span>}
       </div>
       {area.note && <p className="text-sm text-muted-foreground">{area.note}</p>}
+      {walkedShare(area) !== null && (
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-teal-700" style={{ width: `${Math.round(walkedShare(area)! * 100)}%` }} />
+          </div>
+          <span className="text-xs text-muted-foreground">{Math.round(walkedShare(area)! * 100)}%</span>
+        </div>
+      )}
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         {area.open !== null && (
           <span className="font-semibold text-blue-700">{area.open.toLocaleString("nl-NL")} open</span>
