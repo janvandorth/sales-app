@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 import type { DetailView, MapArea, SalesStreet } from "@shared/sales-map-view"
 import type { OpportunitiesView, OpportunityArea, OpportunityDetail, WozBand } from "@shared/sales-opportunities"
 import { addDays, formatDay, today } from "../dashboard/periods"
-import { AGE_STOPS, fillColor, fillOpacity, KANSEN_COLORS } from "./scale"
+import { AGE_STOPS, fillColor, fillOpacity, KANSEN_COLORS, STREET_OPACITY } from "./scale"
 
 type Props = { onBack: () => void }
 type Mode = "sales" | "kansen"
@@ -575,13 +575,26 @@ const SHADED: ExpressionSpecification = ["boolean", ["feature-state", "shaded"],
 
 type FillPaint = { "fill-color": ExpressionSpecification; "fill-opacity": ExpressionSpecification }
 
-/** Areas by feature state; only a faint tint for PC4 once a finer level is drawn over it. */
+/**
+ * Areas by feature state; only a faint tint for PC4 once a finer level is drawn over it. From street zoom on every
+ * shade is see-through (STREET_OPACITY), so streets, buildings and names show under even the darkest one; the colour
+ * keeps the ranking.
+ */
 function statePaint(mode: Mode, faint: boolean): FillPaint {
   const level: ExpressionSpecification = ["feature-state", "level"]
   const opacity = faint ? (["*", FAINT, fillOpacity(mode, level)] as ExpressionSpecification) : fillOpacity(mode, level)
+  const shaded = (value: ExpressionSpecification): ExpressionSpecification => ["case", SHADED, value, 0]
   return {
     "fill-color": fillColor(mode, level, ["feature-state", "age"]),
-    "fill-opacity": ["case", SHADED, opacity, 0],
+    "fill-opacity": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      STREET_ZOOM - 0.5,
+      shaded(opacity),
+      STREET_ZOOM,
+      shaded(["*", STREET_OPACITY, opacity]),
+    ],
   }
 }
 
