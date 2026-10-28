@@ -3,21 +3,21 @@ import { requireUser } from "../_shared/auth.ts"
 import { mapUrl } from "../_shared/contracts-api.ts"
 import { optionalEnv } from "../_shared/env.ts"
 import { HttpError, json, serve } from "../_shared/http.ts"
-import { salesMapRequestSchema, salesMapSchema, salesPc6Schema } from "../_shared/sales-map.ts"
+import { salesMapRequestSchema, salesMapSchema, salesPc5Schema, salesPc6Schema } from "../_shared/sales-map.ts"
 import { demoSalesMap } from "../_shared/sales-map-demo.ts"
-import { salesMapView, salesStreetsView, type SalesMapResponse } from "../_shared/sales-map-view.ts"
+import { salesMapView, salesPc5View, salesStreetsView, type SalesMapResponse } from "../_shared/sales-map-view.ts"
 
 // Where the team sold, for the map, from ZMAdmin via the Contracts API: per PC4 (GET .../Sales/2026.1/Map), or
-// zoomed in the streets in the map's view (.../Map/Pc6). Everyone sees the whole team's areas, when the newest sale
+// zoomed in the PC5 areas (.../Map/Pc5) or the streets (.../Map/Pc6) in the map's view. Everyone sees the whole team's areas, when the newest sale
 // there was and a shade for how much; only admins also get how many sales and by whom. The counts are left out
 // here, not in the app, so a recruiter's phone never receives them.
-// Without STATS_API_KEY the areas are made up (demo mode; no street outlines then).
+// Without STATS_API_KEY the areas are made up (demo mode; no PC5 or street outlines then).
 
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
   const parsed = salesMapRequestSchema.safeParse(await req.json())
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message ?? "Ongeldig verzoek")
-  const { from, to, bbox } = parsed.data
+  const { from, to, bbox, level } = parsed.data
   if (from > to) throw new HttpError(400, "Ongeldige periode")
 
   const { data: profile, error } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
@@ -26,7 +26,12 @@ serve(async (req) => {
 
   const key = optionalEnv("STATS_API_KEY")
   let response: SalesMapResponse
-  if (bbox) {
+  if (bbox && level === "pc5") {
+    const pc5 = key
+      ? await fetchFromApi(`${mapUrl()}/Pc5`, key, { from, to, bbox }, salesPc5Schema)
+      : { areaThresholds: [], areas: [] }
+    response = { demo: !key, streets: salesPc5View(pc5, detailed, from, to) }
+  } else if (bbox) {
     const pc6 = key
       ? await fetchFromApi(`${mapUrl()}/Pc6`, key, { from, to, bbox }, salesPc6Schema)
       : { streetThresholds: [], streets: [] }

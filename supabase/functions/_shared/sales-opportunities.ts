@@ -14,6 +14,7 @@ export type WozBand = (typeof WOZ_BANDS)[number]
 export const salesOpportunitiesRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("areas"), woz: z.enum(WOZ_BANDS) }),
   z.object({ action: z.literal("streets"), woz: z.enum(WOZ_BANDS), pc4: z.string().regex(/^[1-9]\d{3}$/) }),
+  z.object({ action: z.literal("pc5"), woz: z.enum(WOZ_BANDS), bbox: bboxSchema }),
   z.object({ action: z.literal("pc6"), woz: z.enum(WOZ_BANDS), bbox: bboxSchema }),
 ])
 
@@ -57,8 +58,24 @@ export const opportunityPc6Schema = z.object({
   streets: z.array(street.extend({ geometry: z.record(z.string(), z.unknown()) })),
 })
 
+/** The Contracts API's PC5 areas in a view, with their outline and national thresholds by best street. */
+export const opportunityPc5Schema = z.object({
+  areaThresholds: z.array(z.number().int()),
+  areas: z.array(
+    z.object({
+      postcode: z.string().regex(/^\d{4}[A-Z]$/),
+      households: z.number().int(),
+      customers: z.number().int(),
+      open: z.number().int(),
+      bestStreetOpen: z.number().int(),
+      geometry: z.record(z.string(), z.unknown()),
+    }),
+  ),
+})
+
 export type OpportunityAreas = z.infer<typeof opportunityAreasSchema>
 export type OpportunityStreets = z.infer<typeof opportunityStreetsSchema>
+export type OpportunityPc5 = z.infer<typeof opportunityPc5Schema>
 export type OpportunityPc6 = z.infer<typeof opportunityPc6Schema>
 
 /** One PC4 on the map. The numbers only for admins. */
@@ -93,16 +110,18 @@ export type OpportunityStreet = {
   households?: number
   customers?: number
   open?: number
+  /** PC5 only: open households in its best street. */
+  bestStreetOpen?: number
   woz?: number | null
 }
 
 export type OpportunityStreetsView = { detailed: boolean; postcode: string; streets: OpportunityStreet[] }
 
-/** The function's answer: areas, the ranked streets of one area, or the streets in a view. */
+/** The function's answer: areas, the ranked streets of one area, or the PC5 areas or streets in a view. */
 export type SalesOpportunitiesResponse =
   | { demo: boolean; action: "areas"; view: OpportunitiesView }
   | { demo: boolean; action: "streets"; view: OpportunityStreetsView }
-  | { demo: boolean; action: "pc6"; view: StreetsView<OpportunityStreet> }
+  | { demo: boolean; action: "pc5" | "pc6"; view: StreetsView<OpportunityStreet> }
 
 /** Each area by its best street. An area without open households in the band is left out: nothing to win there. */
 export function opportunitiesView(api: OpportunityAreas, detailed: boolean): OpportunitiesView {
@@ -136,6 +155,7 @@ export function opportunityStreetsView(api: OpportunityStreets, detailed: boolea
 export function opportunityPc6View(api: OpportunityPc6, detailed: boolean): StreetsView<OpportunityStreet> {
   return {
     detailed,
+    level: "pc6",
     features: {
       type: "FeatureCollection",
       features: api.streets.map((s) => ({
@@ -146,6 +166,25 @@ export function opportunityPc6View(api: OpportunityPc6, detailed: boolean): Stre
     },
     streets: api.streets.map(({ postcode, households, customers, open, woz }) =>
       detailed ? { postcode, households, customers, open, woz } : { postcode },
+    ),
+  }
+}
+
+/** The PC5 areas in a view, each by its best street ranked against all PC5 areas in the country. */
+export function opportunityPc5View(api: OpportunityPc5, detailed: boolean): StreetsView<OpportunityStreet> {
+  return {
+    detailed,
+    level: "pc5",
+    features: {
+      type: "FeatureCollection",
+      features: api.areas.map((a) => ({
+        type: "Feature",
+        properties: { postcode: a.postcode, level: levelFrom(a.bestStreetOpen, api.areaThresholds) },
+        geometry: a.geometry,
+      })),
+    },
+    streets: api.areas.map(({ postcode, households, customers, open, bestStreetOpen }) =>
+      detailed ? { postcode, households, customers, open, bestStreetOpen } : { postcode },
     ),
   }
 }

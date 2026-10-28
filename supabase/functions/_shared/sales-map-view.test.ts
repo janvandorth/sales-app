@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
-import type { SalesMap, SalesPc6 } from "./sales-map.ts"
-import { ageIn, LEVELS, levelFrom, salesMapView, salesStreetsView, streetThresholds } from "./sales-map-view.ts"
+import { salesPc5Schema, type SalesMap, type SalesPc5, type SalesPc6 } from "./sales-map.ts"
+import {
+  ageIn,
+  LEVELS,
+  levelFrom,
+  salesMapView,
+  salesPc5View,
+  salesStreetsView,
+  streetThresholds,
+} from "./sales-map-view.ts"
 
 // 90 days: 3811's newest sale (20 October) is 7 days before the end, 3812's (5 October) 22.
 const FROM = "2026-07-30"
@@ -93,6 +101,7 @@ describe("salesStreetsView", () => {
   it("gives each street its own shade and age as a GeoJSON feature, on the scale of its area", () => {
     const view = salesStreetsView(pc6, true, FROM, TO)
 
+    expect(view.level).toBe("pc6")
     expect(view.features.features[0]).toEqual({
       type: "Feature",
       properties: { postcode: "3812AA", level: 3, age: 22 / 90 },
@@ -104,6 +113,38 @@ describe("salesStreetsView", () => {
   it("gives a recruiter the street and its newest sale, no count", () => {
     expect(salesStreetsView(pc6, false, FROM, TO).streets).toEqual([
       { postcode: "3812AA", city: "Amersfoort", lastSoldOn: "2026-10-05" },
+    ])
+  })
+})
+
+describe("salesPc5View", () => {
+  const pc5: SalesPc5 = {
+    areaThresholds: [1, 2, 3, 5],
+    areas: [
+      {
+        ...area("3812A", 6, "2026-10-05", [["1210AP", 6]]),
+        postcode: "3812A",
+        bestStreetSold: 4,
+        geometry: { type: "Polygon", coordinates: [] },
+      },
+    ],
+  }
+
+  it("accepts the API's PC5 postcodes", () => {
+    expect(salesPc5Schema.safeParse(pc5).success).toBe(true)
+  })
+
+  it("shades each PC5 area by its busiest street on the national PC5 scale", () => {
+    const view = salesPc5View(pc5, true, FROM, TO)
+
+    expect(view.level).toBe("pc5")
+    expect(view.features.features[0].properties).toEqual({ postcode: "3812A", level: 4, age: 22 / 90 })
+    expect(view.streets[0]).toMatchObject({ sold: 6, bestStreetSold: 4 })
+  })
+
+  it("gives a recruiter the area and its newest sale, no count", () => {
+    expect(salesPc5View(pc5, false, FROM, TO).streets).toEqual([
+      { postcode: "3812A", city: "Amersfoort", lastSoldOn: "2026-10-05" },
     ])
   })
 })

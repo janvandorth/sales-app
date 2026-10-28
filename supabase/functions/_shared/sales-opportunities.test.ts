@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest"
 import { LEVELS } from "./sales-map-view.ts"
 import {
   opportunitiesView,
+  opportunityPc5Schema,
+  opportunityPc5View,
   opportunityPc6View,
   opportunityStreetsView,
   type OpportunityAreas,
+  type OpportunityPc5,
   type OpportunityPc6,
   type OpportunityStreets,
 } from "./sales-opportunities.ts"
@@ -82,5 +85,43 @@ describe("opportunityPc6View", () => {
 
   it("gives a recruiter only the postcode of each street", () => {
     expect(opportunityPc6View(pc6, false).streets).toEqual([{ postcode: "3811AA" }])
+  })
+})
+
+describe("opportunityPc5View", () => {
+  const pc5: OpportunityPc5 = {
+    areaThresholds: [10, 20, 40, 80],
+    areas: [
+      {
+        postcode: "3811A",
+        households: 300,
+        customers: 10,
+        open: 290,
+        bestStreetOpen: 30,
+        geometry: { type: "Polygon", coordinates: [] },
+      },
+    ],
+  }
+
+  it("accepts the API's PC5 postcodes", () => {
+    expect(opportunityPc5Schema.safeParse(pc5).success).toBe(true)
+  })
+
+  it("shades each PC5 area by its best street", () => {
+    const view = opportunityPc5View(pc5, true)
+
+    expect(view.level).toBe("pc5")
+    expect(view.features.features[0].properties).toEqual({ postcode: "3811A", level: 3 })
+    expect(view.streets[0]).toEqual({
+      postcode: "3811A",
+      households: 300,
+      customers: 10,
+      open: 290,
+      bestStreetOpen: 30,
+    })
+  })
+
+  it("gives a recruiter only the postcode of each area", () => {
+    expect(opportunityPc5View(pc5, false).streets).toEqual([{ postcode: "3811A" }])
   })
 })

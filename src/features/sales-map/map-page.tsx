@@ -30,13 +30,16 @@ const PERIODS = [
 /** public/nl-pc4.geojson from scripts/build-pc4-areas.mjs, with the PC4 code in `postcode`. */
 const PC4_AREAS_URL = "/nl-pc4.geojson"
 
-/** From this zoom the streets (PC6) in view are drawn over the PC4 areas. */
+/** From this zoom the PC5 areas in view are drawn over the PC4 areas. */
+const PC5_ZOOM = 11
+
+/** From this zoom the streets (PC6) in view take the place of the PC5 areas. */
 const STREET_ZOOM = 14
 
-/** From this zoom on the way in, a hint says the streets come when zooming in further. */
-const ZOOM_HINT = 11
+/** From this zoom on the way in, a hint says smaller areas come when zooming in further. */
+const ZOOM_HINT = 10
 
-/** How strongly the PC4 areas still show under the streets. */
+/** How strongly the PC4 areas still show under the PC5 areas or streets. */
 const FAINT = 0.2
 
 /** The badge at the top left of the map: large enough to notice while panning. */
@@ -62,9 +65,9 @@ export function SalesMapPage({ onBack }: Props) {
   const [mode, setMode] = useState<Mode>("sales")
   const [periodDays, setPeriodDays] = useState<number>(90)
   const [woz, setWoz] = useState<WozBand>("low")
-  /** The map's zoom, and its box once zoomed in to streets (else null). */
-  const [view, setView] = useState<MapView>({ zoom: 7, bbox: null })
-  const bbox = view.bbox
+  /** The map's zoom, and once zoomed in its box and whether PC5 areas or streets fill it. */
+  const [view, setView] = useState<MapView>({ zoom: 7, bbox: null, level: "pc5" })
+  const { bbox, level } = view
   const until = today()
   const from = addDays(until, -(periodDays - 1))
 
@@ -79,9 +82,9 @@ export function SalesMapPage({ onBack }: Props) {
     enabled: mode === "sales",
   })
   const salesStreets = useQuery({
-    queryKey: ["sales-map-streets", from, until, bbox],
+    queryKey: ["sales-map-streets", from, until, bbox, level],
     queryFn: async () => {
-      const response = await getSalesMap({ from, to: until, bbox: bbox! })
+      const response = await getSalesMap({ from, to: until, bbox: bbox!, level })
       return "streets" in response ? response.streets : undefined
     },
     placeholderData: keepPreviousData,
@@ -100,10 +103,10 @@ export function SalesMapPage({ onBack }: Props) {
     staleTime: 15 * 60_000,
   })
   const kansenStreets = useQuery({
-    queryKey: ["sales-opportunities-streets", woz, bbox],
+    queryKey: ["sales-opportunities-streets", woz, bbox, level],
     queryFn: async () => {
-      const response = await getSalesOpportunities({ action: "pc6", woz, bbox: bbox! })
-      return response.action === "pc6" ? response.view : undefined
+      const response = await getSalesOpportunities({ action: level, woz, bbox: bbox! })
+      return response.action === level ? response.view : undefined
     },
     placeholderData: keepPreviousData,
     enabled: mode === "kansen" && bbox !== null,
@@ -115,11 +118,17 @@ export function SalesMapPage({ onBack }: Props) {
   const opportunities = kansen.data?.view
   const streets: StreetsView<SalesStreet | OpportunityStreet> | undefined =
     bbox === null ? undefined : mode === "sales" ? salesStreets.data : kansenStreets.data
-  // The first look at a spot waits for PDOK's outlines, a few seconds: say so, or the map seems stuck.
+  // The first look at a spot's streets waits for PDOK's outlines, a few seconds: say so, or the map seems stuck.
   const streetsQuery = mode === "sales" ? salesStreets : kansenStreets
-  const streetsLoading = bbox !== null && streetsQuery.isFetching
-  // Close to street level, or zoomed in on a view too wide for it (the backend refuses those): say where to go.
-  const zoomHint = (view.zoom >= ZOOM_HINT && bbox === null) || (bbox !== null && streetsQuery.isError)
+  const loading =
+    bbox === null || !streetsQuery.isFetching ? null : level === "pc5" ? "Gebieden laden…" : "Straten laden…"
+  // Close to the next level, or zoomed in on a view too wide for it (the backend refuses those): say where to go.
+  const zoomHint =
+    (bbox === null && view.zoom >= ZOOM_HINT) || (bbox !== null && streetsQuery.isError)
+      ? "Zoom verder in voor kleinere gebieden"
+      : level === "pc5" && view.zoom >= STREET_ZOOM - 1
+        ? "Zoom verder in voor de straten"
+        : null
 
   const salesAreas = useMemo(() => new Map(salesMap?.areas.map((a) => [a.postcode, a]) ?? []), [salesMap])
   const kansenAreas = useMemo(() => new Map(opportunities?.areas.map((a) => [a.postcode, a]) ?? []), [opportunities])
@@ -127,7 +136,7 @@ export function SalesMapPage({ onBack }: Props) {
   const shades: Map<string, Shade> = mode === "sales" ? salesAreas : kansenAreas
 
   // Read when the map is tapped; kept current without recreating the map.
-  const popup = useRef<PopupFor>({ area: () => document.createElement("div"), street: () => null })
+  const popup = useRef<PopupFor>({ area: () => document.createElement("div"), detail: () => null })
   useEffect(() => {
     const byPostcode = new Map((streets?.streets ?? []).map((s) => [s.postcode, s]))
     const levels = new Map((streets?.features.features ?? []).map((f) => [f.properties.postcode, f.properties.level]))
@@ -136,13 +145,18 @@ export function SalesMapPage({ onBack }: Props) {
         mode === "sales"
           ? (postcode) => salesPopup(postcode, salesAreas.get(postcode), names)
           : (postcode) => kansenPopup(postcode, kansenAreas.get(postcode), woz),
-      street: (postcode) => {
+      detail: (postcode) => {
         const street = byPostcode.get(postcode)
-        if (!street) return null
-        const level = levels.get(postcode) ?? 1
+        if (!street || !streets) return null
+        const rank = levels.get(postcode) ?? 1
+        if (streets.level === "pc5") {
+          return mode === "sales"
+            ? salesPc5Popup(street as SalesStreet, rank, names)
+            : kansenPc5Popup(street as OpportunityStreet, rank)
+        }
         return mode === "sales"
-          ? salesStreetPopup(street as SalesStreet, level, names)
-          : kansenStreetPopup(street as OpportunityStreet, level)
+          ? salesStreetPopup(street as SalesStreet, rank, names)
+          : kansenStreetPopup(street as OpportunityStreet, rank)
       },
     }
   }, [mode, salesAreas, kansenAreas, names, woz, streets])
@@ -212,16 +226,16 @@ export function SalesMapPage({ onBack }: Props) {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <SalesMap mode={mode} shades={shades} streets={streets} popup={popup} onView={setView} />
-        {streetsLoading ? (
+        {loading ? (
           <div role="status" className={BADGE_CLASS}>
             <Spinner className="size-5" />
-            Straten laden…
+            {loading}
           </div>
         ) : (
           zoomHint && (
             <div className={cn(BADGE_CLASS, "text-muted-foreground")}>
               <ZoomInIcon className="size-5" />
-              Zoom verder in voor de straten
+              {zoomHint}
             </div>
           )
         )}
@@ -245,7 +259,7 @@ export function SalesMapPage({ onBack }: Props) {
   )
 }
 
-type PopupFor = { area: (postcode: string) => HTMLElement; street: (postcode: string) => HTMLElement | null }
+type PopupFor = { area: (postcode: string) => HTMLElement; detail: (postcode: string) => HTMLElement | null }
 
 type MapProps = {
   mode: Mode
@@ -256,13 +270,16 @@ type MapProps = {
   onView: (view: MapView) => void
 }
 
-/** The map's zoom, and its box ("minLon,minLat,maxLon,maxLat") from STREET_ZOOM on, else null. */
-type MapView = { zoom: number; bbox: string | null }
+/**
+ * The map's zoom, its box ("minLon,minLat,maxLon,maxLat") from PC5_ZOOM on (else null), and which postcodes fill
+ * the box: PC5 areas, or from STREET_ZOOM on the streets.
+ */
+type MapView = { zoom: number; bbox: string | null; level: "pc5" | "pc6" }
 
 /**
- * The MapLibre map. PC4 shades are set as feature state, so new numbers never reload the areas; once the backend's
- * street outlines for a zoomed-in view have arrived, they take over and the areas stay only as a faint tint, so the
- * map is never empty while the streets load.
+ * The MapLibre map. PC4 shades are set as feature state, so new numbers never reload the areas. Zoomed in, the
+ * backend's PC5 or street outlines for the view take over once they have arrived, and until then the previous level
+ * stays, so the map is never empty while they load; the PC4 areas stay underneath as a faint tint.
  */
 function SalesMap({ mode, shades, streets, popup, onView }: MapProps) {
   const container = useRef<HTMLDivElement>(null)
@@ -303,7 +320,7 @@ function SalesMap({ mode, shades, streets, popup, onView }: MapProps) {
             promoteId: "postcode",
             attribution: "Postcodegebieden en huishoudens: CBS, Esri Nederland",
           },
-          pc6: { type: "geojson", data: EMPTY, promoteId: "postcode" },
+          detail: { type: "geojson", data: EMPTY, promoteId: "postcode" },
         },
         layers: [
           { id: "background", type: "raster", source: "background" },
@@ -314,12 +331,12 @@ function SalesMap({ mode, shades, streets, popup, onView }: MapProps) {
             source: "pc4",
             paint: { "line-color": "#334155", "line-width": 0.5, "line-opacity": ["case", shaded, 0.6, 0.15] },
           },
-          { id: "pc6-fill", type: "fill", source: "pc6", minzoom: STREET_ZOOM, paint: pc6Paint("sales") },
+          { id: "detail-fill", type: "fill", source: "detail", minzoom: PC5_ZOOM, paint: detailPaint("sales") },
           {
-            id: "pc6-line",
+            id: "detail-line",
             type: "line",
-            source: "pc6",
-            minzoom: STREET_ZOOM,
+            source: "detail",
+            minzoom: PC5_ZOOM,
             paint: { "line-color": "#334155", "line-width": 0.4, "line-opacity": 0.5 },
           },
         ],
@@ -328,24 +345,25 @@ function SalesMap({ mode, shades, streets, popup, onView }: MapProps) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
     map.on("load", () => setLoaded(true))
 
-    // Tell the page the zoom and, zoomed in, which streets to ask for; a moment after the map stops, not every frame.
+    // Tell the page the zoom and, zoomed in, which areas to ask for; a moment after the map stops, not every frame.
     let wait: ReturnType<typeof setTimeout> | undefined
     map.on("moveend", () => {
       clearTimeout(wait)
       wait = setTimeout(() => {
         const zoom = map.getZoom()
-        if (zoom < STREET_ZOOM) return viewChanged.current({ zoom, bbox: null })
+        const level = zoom >= STREET_ZOOM ? "pc6" : "pc5"
+        if (zoom < PC5_ZOOM) return viewChanged.current({ zoom, bbox: null, level })
         const b = map.getBounds()
         const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(3)).join(",")
-        viewChanged.current({ zoom, bbox })
+        viewChanged.current({ zoom, bbox, level })
       }, 400)
     })
 
     const info = new maplibregl.Popup({ closeButton: true, maxWidth: "280px" })
     map.on("click", (event) => {
-      const [street] =
-        map.getZoom() >= STREET_ZOOM ? map.queryRenderedFeatures(event.point, { layers: ["pc6-fill"] }) : []
-      const content = street?.id !== undefined ? popup.current.street(String(street.id)) : null
+      const [detail] =
+        map.getZoom() >= PC5_ZOOM ? map.queryRenderedFeatures(event.point, { layers: ["detail-fill"] }) : []
+      const content = detail?.id !== undefined ? popup.current.detail(String(detail.id)) : null
       if (content) return void info.setLngLat(event.lngLat).setDOMContent(content).addTo(map)
       const [area] = map.queryRenderedFeatures(event.point, { layers: ["pc4-fill"] })
       if (area?.id === undefined) return void info.remove()
@@ -372,22 +390,22 @@ function SalesMap({ mode, shades, streets, popup, onView }: MapProps) {
     if (!map || !loaded) return
     const shaded: ExpressionSpecification = ["boolean", ["feature-state", "shaded"], false]
     const pc4 = pc4Paint(mode, shaded, streetsShown)
-    const pc6 = pc6Paint(mode)
+    const detail = detailPaint(mode)
     map.setPaintProperty("pc4-fill", "fill-color", pc4["fill-color"])
     map.setPaintProperty("pc4-fill", "fill-opacity", pc4["fill-opacity"])
-    map.setPaintProperty("pc6-fill", "fill-color", pc6["fill-color"])
-    map.setPaintProperty("pc6-fill", "fill-opacity", pc6["fill-opacity"])
+    map.setPaintProperty("detail-fill", "fill-color", detail["fill-color"])
+    map.setPaintProperty("detail-fill", "fill-opacity", detail["fill-opacity"])
     map.removeFeatureState({ source: "pc4" })
     for (const [postcode, shade] of shades) {
       map.setFeatureState({ source: "pc4", id: postcode }, { shaded: true, level: shade.level, age: shade.age ?? 1 })
     }
   }, [mode, shades, loaded, streetsShown])
 
-  // The streets of the view, or none when zoomed out.
+  // The PC5 areas or streets of the view, or none when zoomed out.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
-    ;(map.getSource("pc6") as GeoJSONSource).setData((streets?.features ?? EMPTY) as never)
+    ;(map.getSource("detail") as GeoJSONSource).setData((streets?.features ?? EMPTY) as never)
   }, [streets, loaded])
 
   // The container itself fills the space: MapLibre's stylesheet makes it position: relative, so absolute won't hold.
@@ -396,7 +414,7 @@ function SalesMap({ mode, shades, streets, popup, onView }: MapProps) {
 
 type FillPaint = { "fill-color": ExpressionSpecification; "fill-opacity": ExpressionSpecification }
 
-/** PC4 areas by feature state; only a faint tint once the streets of the view are drawn over them. */
+/** PC4 areas by feature state; only a faint tint once the PC5 areas or streets of the view are drawn over them. */
 function pc4Paint(mode: Mode, shaded: ExpressionSpecification, faint: boolean): FillPaint {
   const level: ExpressionSpecification = ["feature-state", "level"]
   const opacity = faint ? (["*", FAINT, fillOpacity(mode, level)] as ExpressionSpecification) : fillOpacity(mode, level)
@@ -406,8 +424,8 @@ function pc4Paint(mode: Mode, shaded: ExpressionSpecification, faint: boolean): 
   }
 }
 
-/** Streets by the properties the backend put on them. */
-function pc6Paint(mode: Mode): FillPaint {
+/** PC5 areas or streets by the properties the backend put on them. */
+function detailPaint(mode: Mode): FillPaint {
   const level: ExpressionSpecification = ["get", "level"]
   return { "fill-color": fillColor(mode, level, ["get", "age"]), "fill-opacity": fillOpacity(mode, level) }
 }
@@ -439,6 +457,7 @@ function popupRoot(): [
   return [root, add]
 }
 
+/** "1234AB" as "1234 AB", "1234A" as "1234 A". */
 const pc6Label = (postcode: string) => `${postcode.slice(0, 4)} ${postcode.slice(4)}`
 
 function salesPopup(postcode: string, area: MapArea | undefined, names: Map<string, string>): HTMLElement {
@@ -450,6 +469,20 @@ function salesPopup(postcode: string, area: MapArea | undefined, names: Map<stri
   }
   add("div", `Laatste verkoop op ${formatDay(area.lastSoldOn)}`)
   add("div", `Drukste straat: ${RANKS[area.level].toLowerCase()}`, "text-muted-foreground")
+  if (area.sold !== undefined) {
+    add("div", `${area.sold} ${area.sold === 1 ? "verkoop" : "verkopen"}, drukste straat ${area.bestStreetSold}`)
+    const list = add("ul", "", "pt-1")
+    for (const r of area.recruiters ?? []) add("li", `${names.get(r.recruiter) ?? r.recruiter}: ${r.sold}`, "", list)
+  }
+  add("div", "Zoom in om de straten te zien", "pt-1 text-xs text-muted-foreground")
+  return root
+}
+
+function salesPc5Popup(area: SalesStreet, level: number, names: Map<string, string>): HTMLElement {
+  const [root, add] = popupRoot()
+  add("div", `${pc6Label(area.postcode)}${area.city ? ` · ${area.city}` : ""}`, "font-semibold")
+  add("div", `Laatste verkoop op ${formatDay(area.lastSoldOn)}`)
+  add("div", `Drukste straat: ${RANKS[level].toLowerCase()}`, "text-muted-foreground")
   if (area.sold !== undefined) {
     add("div", `${area.sold} ${area.sold === 1 ? "verkoop" : "verkopen"}, drukste straat ${area.bestStreetSold}`)
     const list = add("ul", "", "pt-1")
@@ -502,6 +535,18 @@ function kansenPopup(postcode: string, area: OpportunityArea | undefined, woz: W
       status.textContent = getErrorMessage(error)
       status.className = "pt-1 text-destructive"
     })
+  return root
+}
+
+function kansenPc5Popup(area: OpportunityStreet, level: number): HTMLElement {
+  const [root, add] = popupRoot()
+  add("div", pc6Label(area.postcode), "font-semibold")
+  add("div", `Beste straat: ${RANKS[level].toLowerCase()}`, "text-muted-foreground")
+  if (area.open !== undefined && area.households !== undefined) {
+    add("div", `${nl(area.open)} van ${nl(area.households)} huishoudens nog geen klant`)
+    add("div", `Beste straat: ${nl(area.bestStreetOpen ?? 0)} nog geen klant`)
+  }
+  add("div", "Zoom in om de straten te zien", "pt-1 text-xs text-muted-foreground")
   return root
 }
 

@@ -1,10 +1,10 @@
 // What the map shows, made by the sales-map function from the Contracts API's sales per street (PC6). Everyone sees
 // where and how recently the team sold, and how much as one of LEVELS shades. Only admins get the numbers: for
 // recruiters no count of any kind leaves the server, not per area, not per recruiter, not in total.
-// A PC4 area is shaded by its busiest street, ranked against the busiest streets of all other areas, so a dark area
-// is one with a street worth zooming in to, however big or small the area is. Zoomed in, each street is ranked among
-// all streets. No Deno APIs here.
-import type { SalesMap, SalesPc6 } from "./sales-map.ts"
+// A PC4 or PC5 area is shaded by its busiest street, ranked against the busiest streets of all other areas of its
+// size, so a dark area is one with a street worth zooming in to, however big or small the area is. Zoomed in to
+// streets, each street is ranked among all streets. No Deno APIs here.
+import type { SalesMap, SalesPc5, SalesPc6 } from "./sales-map.ts"
 
 /** Shades of "how much": coarse enough that a recruiter cannot work the counts back out. */
 export const LEVELS = 5
@@ -26,7 +26,7 @@ export type MapArea = {
   recruiters?: { recruiter: string; sold: number }[]
 }
 
-/** The sales-map function's answer: the PC4 areas, or (asked with a view) the streets in it. */
+/** The sales-map function's answer: the PC4 areas, or (asked with a view) the PC5 areas or streets in it. */
 export type SalesMapResponse =
   { demo: boolean; map: SalesMapView } | { demo: boolean; streets: StreetsView<SalesStreet> }
 
@@ -40,21 +40,25 @@ export type SalesMapView = {
   recruiters: { number: string; name: string }[]
 }
 
-/** One street (PC6) of the zoomed-in map. The numbers only for admins. */
+/** One PC5 area or street (PC6) of the zoomed-in map. The numbers only for admins. */
 export type SalesStreet = {
   postcode: string
   city: string
   lastSoldOn: string
   sold?: number
+  /** PC5 only: sales in its busiest street. */
+  bestStreetSold?: number
   recruiters?: { recruiter: string; sold: number }[]
 }
 
 /**
- * The streets in a view: outlines with what they are drawn by (level, and on the sales map the age) as GeoJSON for
- * the map, and per street what its popup shows.
+ * The PC5 areas or streets in a view: outlines with what they are drawn by (level, and on the sales map the age) as
+ * GeoJSON for the map, and per postcode what its popup shows.
  */
 export type StreetsView<T> = {
   detailed: boolean
+  /** Which postcodes these are. */
+  level: "pc5" | "pc6"
   features: {
     type: "FeatureCollection"
     features: { type: "Feature"; properties: { postcode: string; level: number; age?: number }; geometry: unknown }[]
@@ -124,6 +128,7 @@ export function salesMapView(map: SalesMap, detailed: boolean, from: string, to:
 export function salesStreetsView(pc6: SalesPc6, detailed: boolean, from: string, to: string): StreetsView<SalesStreet> {
   return {
     detailed,
+    level: "pc6",
     features: {
       type: "FeatureCollection",
       features: pc6.streets.map((s) => ({
@@ -138,6 +143,29 @@ export function salesStreetsView(pc6: SalesPc6, detailed: boolean, from: string,
     },
     streets: pc6.streets.map(({ postcode, city, lastSoldOn, sold, recruiters }) =>
       detailed ? { postcode, city, lastSoldOn, sold, recruiters } : { postcode, city, lastSoldOn },
+    ),
+  }
+}
+
+/** The PC5 areas in a view, each by its busiest street ranked against all PC5 areas in the country. */
+export function salesPc5View(pc5: SalesPc5, detailed: boolean, from: string, to: string): StreetsView<SalesStreet> {
+  return {
+    detailed,
+    level: "pc5",
+    features: {
+      type: "FeatureCollection",
+      features: pc5.areas.map((a) => ({
+        type: "Feature",
+        properties: {
+          postcode: a.postcode,
+          level: levelFrom(a.bestStreetSold, pc5.areaThresholds),
+          age: ageIn(a.lastSoldOn, from, to),
+        },
+        geometry: a.geometry,
+      })),
+    },
+    streets: pc5.areas.map(({ postcode, city, lastSoldOn, sold, bestStreetSold, recruiters }) =>
+      detailed ? { postcode, city, lastSoldOn, sold, bestStreetSold, recruiters } : { postcode, city, lastSoldOn },
     ),
   }
 }

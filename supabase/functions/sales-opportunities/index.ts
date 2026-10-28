@@ -7,6 +7,8 @@ import { demoOpportunityAreas, demoOpportunityStreets } from "../_shared/sales-o
 import {
   opportunitiesView,
   opportunityAreasSchema,
+  opportunityPc5Schema,
+  opportunityPc5View,
   opportunityPc6Schema,
   opportunityPc6View,
   opportunityStreetsSchema,
@@ -16,9 +18,9 @@ import {
 } from "../_shared/sales-opportunities.ts"
 
 // Where households are still "for grabs" for the map, from the Contracts API: per PC4, the ranked streets of one,
-// or (zoomed in) the streets in the map's view. Everyone sees the shades and the streets; only admins get
+// or (zoomed in) the PC5 areas or the streets in the map's view. Everyone sees the shades and the streets; only admins get
 // households, customers and open households. The numbers are left out here, not in the app, so a recruiter's phone
-// never receives them. Without STATS_API_KEY the answers are made up (demo mode; no street outlines then).
+// never receives them. Without STATS_API_KEY the answers are made up (demo mode; no PC5 or street outlines then).
 
 serve(async (req) => {
   const { supabase, user } = await requireUser(req)
@@ -42,6 +44,11 @@ serve(async (req) => {
       ? await fetchFromApi(opportunitiesUrl(request.pc4), key, request.woz, opportunityStreetsSchema)
       : demoOpportunityStreets(request.pc4, request.woz)
     response = { demo: !key, action: "streets", view: opportunityStreetsView(api, detailed) }
+  } else if (request.action === "pc5") {
+    const api = key
+      ? await fetchFromApi(opportunitiesUrl("Pc5"), key, request.woz, opportunityPc5Schema, request.bbox)
+      : { areaThresholds: [], areas: [] }
+    response = { demo: !key, action: "pc5", view: opportunityPc5View(api, detailed) }
   } else {
     const api = key
       ? await fetchFromApi(opportunitiesUrl("Pc6"), key, request.woz, opportunityPc6Schema, request.bbox)

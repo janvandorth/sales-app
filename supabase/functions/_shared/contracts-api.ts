@@ -44,7 +44,10 @@ export function mapUrl(): string {
   return MAP_URL
 }
 
-/** GET endpoints with households not yet a customer: per PC4, or (with a PC4) its best streets. TEST, STATS_API_KEY. */
+/**
+ * GET endpoints with households not yet a customer: per PC4, with a PC4 its best streets, or with "Pc5" or "Pc6" the
+ * areas in a view. TEST, STATS_API_KEY.
+ */
 export function opportunitiesUrl(pc4?: string): string {
   return pc4 ? `${OPPORTUNITIES_URL}/${pc4}` : OPPORTUNITIES_URL
 }

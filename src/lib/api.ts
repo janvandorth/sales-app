@@ -121,10 +121,13 @@ export async function getKpi(request: KpiRequest): Promise<KpiResponse> {
 export async function getSalesMap(request: SalesMapRequest): Promise<SalesMapResponse> {
   if (import.meta.env.DEV && DEMO_MODE) {
     const { demoSalesMap } = await import("@shared/sales-map-demo")
-    const { salesMapView, salesStreetsView } = await import("@shared/sales-map-view")
+    const { salesMapView, salesPc5View, salesStreetsView } = await import("@shared/sales-map-view")
     const detailed = DEMO_MODE === "admin"
     await new Promise((resolve) => setTimeout(resolve, 400))
-    // The demo has no street outlines: zoomed in, the areas simply fade out.
+    // The demo has no PC5 or street outlines: zoomed in, the areas simply fade out.
+    if (request.bbox && request.level === "pc5") {
+      return { demo: true, streets: salesPc5View({ areaThresholds: [], areas: [] }, detailed, "", "") }
+    }
     if (request.bbox) {
       return { demo: true, streets: salesStreetsView({ streetThresholds: [], streets: [] }, detailed, "", "") }
     }
@@ -150,6 +153,9 @@ export async function getSalesOpportunities(request: SalesOpportunitiesRequest):
     if (request.action === "streets") {
       const streets = demo.demoOpportunityStreets(request.pc4, request.woz)
       return { demo: true, action: "streets", view: shared.opportunityStreetsView(streets, detailed) }
+    }
+    if (request.action === "pc5") {
+      return { demo: true, action: "pc5", view: shared.opportunityPc5View({ areaThresholds: [], areas: [] }, detailed) }
     }
     return {
       demo: true,

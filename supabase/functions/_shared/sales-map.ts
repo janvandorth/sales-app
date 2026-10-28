@@ -1,5 +1,5 @@
 // Shared between the sales-map edge function and the web app: the map's request and the sales per postcode that
-// come from ZMAdmin (Contracts API, GET .../Sales/2026.1/Map and .../Map/Pc6). No Deno APIs here.
+// come from ZMAdmin (Contracts API, GET .../Sales/2026.1/Map, .../Map/Pc5 and .../Map/Pc6). No Deno APIs here.
 import { z } from "zod"
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ongeldige datum")
@@ -12,8 +12,9 @@ export const salesMapRequestSchema = z.object({
   from: isoDate,
   /** Last sale day, inclusive (yyyy-MM-dd). */
   to: isoDate,
-  /** With it: the streets (PC6) in this view instead of the PC4 areas, for the zoomed-in map. */
+  /** With it: the PC5 areas or the streets (PC6, the default) in this view instead of the PC4 areas. */
   bbox: bboxSchema.optional(),
+  level: z.enum(["pc5", "pc6"]).optional(),
 })
 
 export type SalesMapRequest = z.input<typeof salesMapRequestSchema>
@@ -44,6 +45,19 @@ export const salesPc6Schema = z.object({
   streets: z.array(salesArea.extend({ geometry: z.record(z.string(), z.unknown()) })),
 })
 
+/** The Contracts API's PC5 areas in a view, with their outline and national thresholds by best street. */
+export const salesPc5Schema = z.object({
+  areaThresholds: z.array(z.number().int()),
+  areas: z.array(
+    salesArea.extend({
+      postcode: z.string().regex(/^\d{4}[A-Z]$/),
+      bestStreetSold: z.number().int(),
+      geometry: z.record(z.string(), z.unknown()),
+    }),
+  ),
+})
+
 export type SalesMap = z.infer<typeof salesMapSchema>
 export type SalesMapArea = SalesMap["areas"][number]
+export type SalesPc5 = z.infer<typeof salesPc5Schema>
 export type SalesPc6 = z.infer<typeof salesPc6Schema>
