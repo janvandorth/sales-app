@@ -62,6 +62,7 @@ const OUTCOME_STYLES: Record<Outcome | "open", string> = {
   later: "bg-orange-300 text-orange-950",
   sold: "bg-blue-700 text-white",
   skip: "border border-dashed text-muted-foreground line-through",
+  walked: "bg-primary text-primary-foreground",
 }
 
 /**

@@ -4,7 +4,8 @@
  * addition ("toevoeging", e.g. "A" or "-2").
  */
 
-export type Outcome = "not_home" | "no_interest" | "later" | "sold" | "skip"
+/** "walked": ticked off by the sales manager afterwards, from what the werver told. */
+export type Outcome = "not_home" | "no_interest" | "later" | "sold" | "skip" | "walked"
 
 export type Door = {
   postcode: string
@@ -42,6 +43,7 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   later: "terugkomen",
   sold: "verkocht",
   skip: "overgeslagen",
+  walked: "gelopen",
 }
 
 export const doorKey = (d: Pick<Door, "postcode" | "huisnummer" | "toevoeging">) =>

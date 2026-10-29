@@ -145,3 +145,12 @@ export function demoRecordVisit(visit: Door & { outcome: Outcome; wervernr: stri
 export function demoDeleteVisit(id: string): void {
   visits = visits.filter((v) => v.id !== id)
 }
+
+export function demoRecordTicked(doors: (Door & { id: string; wervernr: string; visitedAt: string })[]): void {
+  visits.push(...doors.map((d) => ({ ...d, outcome: "walked" as const })))
+}
+
+export function demoDeleteVisits(ids: string[]): void {
+  const gone = new Set(ids)
+  visits = visits.filter((v) => !gone.has(v.id))
+}

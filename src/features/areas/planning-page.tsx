@@ -3,6 +3,7 @@ import {
   ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ListChecksIcon,
   MapIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -53,6 +54,8 @@ type Props = {
   onShow: (area: AreaAssignment) => void
   /** Opens a werver's own list of areas, as they see it. */
   onViewAs: (werver: AreaMember) => void
+  /** Opens the area to tick off what was walked in it. */
+  onTick: (area: AreaAssignment) => void
 }
 
 /** Monday to Saturday. */
@@ -62,7 +65,7 @@ const DAYS = 6
  * The sales manager's week: per day who works where, and who has nothing yet. A day's count says how many wervers
  * have an area that day, so a gap shows before the day is picked.
  */
-export function PlanningPage({ onBack, onAssign, onShow, onViewAs }: Props) {
+export function PlanningPage({ onBack, onAssign, onShow, onViewAs, onTick }: Props) {
   const now = today()
   const [monday, setMonday] = useState(periodStart(now, "week"))
   const days = Array.from({ length: DAYS }, (_, i) => addDays(monday, i))
@@ -154,7 +157,13 @@ export function PlanningPage({ onBack, onAssign, onShow, onViewAs }: Props) {
           </div>
         )}
         {onDay(day).map((area) => (
-          <AreaCard key={area.id} area={area} onShow={() => onShow(area)} onViewAs={onViewAs} />
+          <AreaCard
+            key={area.id}
+            area={area}
+            onShow={() => onShow(area)}
+            onTick={() => onTick(area)}
+            onViewAs={onViewAs}
+          />
         ))}
         {day >= now &&
           free.map((r) => (
@@ -183,9 +192,14 @@ export function PlanningPage({ onBack, onAssign, onShow, onViewAs }: Props) {
   )
 }
 
-type AreaCardProps = { area: AreaAssignment; onShow: () => void; onViewAs: (werver: AreaMember) => void }
+type AreaCardProps = {
+  area: AreaAssignment
+  onShow: () => void
+  onTick: () => void
+  onViewAs: (werver: AreaMember) => void
+}
 
-function AreaCard({ area, onShow, onViewAs }: AreaCardProps) {
+function AreaCard({ area, onShow, onTick, onViewAs }: AreaCardProps) {
   const remove = useDeleteAreaAssignment()
   const needs = tooBig(area)
   const days = area.startsOn === area.endsOn ? null : spanLabel(area.startsOn, area.endsOn, true)
@@ -221,6 +235,9 @@ function AreaCard({ area, onShow, onViewAs }: AreaCardProps) {
         )}
         <span>{area.sold} verkocht</span>
         <span className="flex-1" />
+        <Button variant="ghost" size="icon" aria-label="Afvinken" onClick={onTick}>
+          <ListChecksIcon />
+        </Button>
         <Button variant="ghost" size="icon" aria-label="Op de kaart" onClick={onShow}>
           <MapIcon />
         </Button>
