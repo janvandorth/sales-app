@@ -8,15 +8,21 @@ import type { Status } from "./tick"
 
 const LEVELS: PostcodeLevel[] = ["pc4", "pc5", "pc6"]
 
-/** Where each level's tiles start, and where the next one takes over, as on the sales map. */
+/** Where each level's tiles start, as on the sales map. */
 const MIN_ZOOM: Record<PostcodeLevel, number> = { pc4: 0, pc5: 11, pc6: 13 }
-const MAX_ZOOM: Record<PostcodeLevel, number> = { pc4: 11, pc5: 13, pc6: 24 }
 
 const levelAt = (zoom: number): PostcodeLevel => (zoom >= MIN_ZOOM.pc6 ? "pc6" : zoom >= MIN_ZOOM.pc5 ? "pc5" : "pc4")
 
 const DONE = "#12293b"
 
 const oneOf = (codes: string[]): FilterSpecification => ["in", ["get", "postcode"], ["literal", codes]]
+
+/** The postcodes of a level with any of the area in them: those inside it, and the larger ones around a part. */
+function inArea(codes: string[], level: PostcodeLevel): FilterSpecification {
+  const length = Number(level.slice(2))
+  const around = codes.filter((c) => c.length > length).map((c) => c.slice(0, length))
+  return ["any", coveredBy(codes), oneOf([...new Set(around)])] as FilterSpecification
+}
 
 type Props = {
   area: AreaAssignment
@@ -28,7 +34,10 @@ type Props = {
   onTap: (code: string) => void
 }
 
-/** The area on the map, done postcodes filled: a tap ticks off the PC4, PC5 or PC6 under it. */
+/**
+ * The area on the map at the level picked, its postcodes outlined and the done ones filled at that level: a tap
+ * ticks off the PC4, PC5 or PC6 under it, as outlined.
+ */
 export default function TickMap({ area, bounds, statuses, onTap }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<MapLibreMap | null>(null)
@@ -42,7 +51,6 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
 
   useEffect(() => {
     if (!container.current) return
-    const inArea = coveredBy(area.postcodes)
     const m = new maplibregl.Map({
       container: container.current,
       ...(bounds
@@ -60,36 +68,36 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
           { id: "background", type: "raster", source: "background" },
           ...LEVELS.flatMap((l) => {
             const base = { source: l, "source-layer": l, minzoom: MIN_ZOOM[l] }
+            // Shown once loaded, for the level picked only.
+            const drawn = { ...base, layout: { visibility: "none" as const } }
             return [
               {
-                ...base,
+                ...drawn,
                 id: `${l}-part`,
                 type: "fill" as const,
-                maxzoom: MAX_ZOOM[l],
                 filter: oneOf([]),
                 paint: { "fill-color": DONE, "fill-opacity": 0.18 },
               },
               {
-                ...base,
+                ...drawn,
                 id: `${l}-done`,
                 type: "fill" as const,
-                maxzoom: MAX_ZOOM[l],
                 filter: oneOf([]),
                 paint: { "fill-color": DONE, "fill-opacity": 0.55 },
               },
               {
-                ...base,
+                ...drawn,
                 id: `${l}-line`,
                 type: "line" as const,
-                filter: inArea,
-                paint: { "line-color": DONE, "line-width": l === "pc6" ? 1 : 2, "line-opacity": 0.7 },
+                filter: inArea(area.postcodes, l),
+                paint: { "line-color": DONE, "line-width": 1.5, "line-opacity": 0.8 },
               },
               // What a tap at this level hits: the area's postcodes, unseen.
               {
                 ...base,
                 id: `${l}-hit`,
                 type: "fill" as const,
-                filter: inArea,
+                filter: inArea(area.postcodes, l),
                 paint: { "fill-color": DONE, "fill-opacity": 0 },
               },
             ]
@@ -122,6 +130,17 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
       m.setFilter(`${l}-part`, oneOf(of("part")))
     }
   }, [statuses, loaded])
+
+  // Only the level a tap picks is drawn, whatever the zoom: what is outlined is what a tap ticks off.
+  useEffect(() => {
+    const m = map.current
+    if (!m || !loaded) return
+    for (const l of LEVELS) {
+      for (const layer of ["part", "done", "line"]) {
+        m.setLayoutProperty(`${l}-${layer}`, "visibility", l === level ? "visible" : "none")
+      }
+    }
+  }, [level, loaded])
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
