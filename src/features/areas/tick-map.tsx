@@ -8,8 +8,9 @@ import type { Status } from "./tick"
 
 const LEVELS: PostcodeLevel[] = ["pc4", "pc5", "pc6"]
 
-/** Where each level's tiles start, as on the sales map. */
+/** Where each level's tiles start, and where the next one takes over, as on the sales map. */
 const MIN_ZOOM: Record<PostcodeLevel, number> = { pc4: 0, pc5: 11, pc6: 13 }
+const MAX_ZOOM: Record<PostcodeLevel, number> = { pc4: 11, pc5: 13, pc6: 24 }
 
 const levelAt = (zoom: number): PostcodeLevel => (zoom >= MIN_ZOOM.pc6 ? "pc6" : zoom >= MIN_ZOOM.pc5 ? "pc5" : "pc4")
 
@@ -35,8 +36,8 @@ type Props = {
 }
 
 /**
- * The area on the map at the level picked, its postcodes outlined and the done ones filled at that level: a tap
- * ticks off the PC4, PC5 or PC6 under it, as outlined.
+ * The area on the map, what was walked filled as finely as the zoom allows, and the postcodes of the level picked
+ * outlined: a tap ticks off the PC4, PC5 or PC6 under it, as outlined.
  */
 export default function TickMap({ area, bounds, statuses, onTap }: Props) {
   const container = useRef<HTMLDivElement>(null)
@@ -68,29 +69,39 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
           { id: "background", type: "raster", source: "background" },
           ...LEVELS.flatMap((l) => {
             const base = { source: l, "source-layer": l, minzoom: MIN_ZOOM[l] }
-            // Shown once loaded, for the level picked only.
-            const drawn = { ...base, layout: { visibility: "none" as const } }
+            // What was walked and the area's own postcodes, at the finest level the zoom has: a PC4 picked shows
+            // the PC6s done in it, not the whole PC4 filled.
+            const finest = { ...base, maxzoom: MAX_ZOOM[l] }
             return [
               {
-                ...drawn,
+                ...finest,
                 id: `${l}-part`,
                 type: "fill" as const,
                 filter: oneOf([]),
                 paint: { "fill-color": DONE, "fill-opacity": 0.18 },
               },
               {
-                ...drawn,
+                ...finest,
                 id: `${l}-done`,
                 type: "fill" as const,
                 filter: oneOf([]),
                 paint: { "fill-color": DONE, "fill-opacity": 0.55 },
               },
               {
-                ...drawn,
+                ...finest,
+                id: `${l}-area`,
+                type: "line" as const,
+                filter: coveredBy(area.postcodes),
+                paint: { "line-color": DONE, "line-width": 0.75, "line-opacity": 0.4 },
+              },
+              // What a tap picks: the postcodes of the level picked; shown for that level only.
+              {
+                ...base,
                 id: `${l}-line`,
                 type: "line" as const,
+                layout: { visibility: "none" as const },
                 filter: inArea(area.postcodes, l),
-                paint: { "line-color": DONE, "line-width": 1.5, "line-opacity": 0.8 },
+                paint: { "line-color": DONE, "line-width": 2, "line-opacity": 0.85 },
               },
               // What a tap at this level hits: the area's postcodes, unseen.
               {
@@ -131,15 +142,11 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
     }
   }, [statuses, loaded])
 
-  // Only the level a tap picks is drawn, whatever the zoom: what is outlined is what a tap ticks off.
+  // The level a tap picks is outlined whatever the zoom: what is outlined is what a tap ticks off.
   useEffect(() => {
     const m = map.current
     if (!m || !loaded) return
-    for (const l of LEVELS) {
-      for (const layer of ["part", "done", "line"]) {
-        m.setLayoutProperty(`${l}-${layer}`, "visibility", l === level ? "visible" : "none")
-      }
-    }
+    for (const l of LEVELS) m.setLayoutProperty(`${l}-line`, "visibility", l === level ? "visible" : "none")
   }, [level, loaded])
 
   return (
