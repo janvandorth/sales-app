@@ -6,6 +6,7 @@ import { AdminPage } from "@/features/admin/admin-page"
 import type { Door } from "@/features/areas/doors"
 import { MyAreasPage } from "@/features/areas/my-areas-page"
 import { PlanningPage } from "@/features/areas/planning-page"
+import { TickPage } from "@/features/areas/tick-page"
 import { WalkPage } from "@/features/areas/walk-page"
 import { ChangePasswordDialog } from "@/features/auth/change-password-dialog"
 import { LoginPage } from "@/features/auth/login-page"
@@ -116,8 +117,12 @@ export default function App() {
           onAssign={(assign) => openMap({ assign })}
           onShow={(focus) => openMap({ focus })}
           onViewAs={(werver) => go({ view: "areas", viewedAs: werver })}
+          onTick={(area) => go({ view: "tick", ticking: area })}
         />
       )
+    }
+    if (view === "tick" && page.ticking) {
+      return <TickPage area={page.ticking} onBack={() => back({ view: "planning" })} />
     }
     if (view === "areas") {
       return (

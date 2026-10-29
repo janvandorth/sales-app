@@ -8,7 +8,7 @@ import type { AreaAssignment, AreaMember, AssignStart } from "@/features/areas/a
  * and a page that needs more than it holds opens one step up.
  */
 
-export type View = "form" | "dashboard" | "map" | "sales" | "admin" | "planning" | "areas" | "walk"
+export type View = "form" | "dashboard" | "map" | "sales" | "admin" | "planning" | "areas" | "walk" | "tick"
 
 /** How the map opens: plain, giving out an area, or on one area. */
 export type MapStart = { assign?: AssignStart; focus?: AreaAssignment }
@@ -20,6 +20,8 @@ export type Page = {
   viewedAs?: AreaMember
   /** The area being walked door by door; on the form, the walk it was opened from. */
   walking?: AreaAssignment
+  /** The area a sales manager ticks off. */
+  ticking?: AreaAssignment
 }
 
 /** A page in history, with how many of the app's pages lie before it in this tab. */
@@ -34,6 +36,7 @@ const PATHS: Record<View, string> = {
   planning: "/werkgebieden",
   areas: "/gebieden",
   walk: "/lopen",
+  tick: "/afvinken",
 }
 
 /** The address of a page: its path, and what of its state an address can hold. */
@@ -43,6 +46,7 @@ export function urlOf(page: Page): string {
   if (page.view === "map" && page.map?.focus) params.set("gebied", page.map.focus.id)
   if (page.view === "map" && page.map?.assign) params.set("toewijzen", "")
   if (page.view === "walk" && page.walking) params.set("gebied", page.walking.id)
+  if (page.view === "tick" && page.ticking) params.set("gebied", page.ticking.id)
   const search = params.toString().replace(/=(?=&|$)/g, "")
   return PATHS[page.view] + (search ? `?${search}` : "")
 }
@@ -57,6 +61,7 @@ export function pageFromUrl(pathname: string, search: string): Page {
   const werver = new URLSearchParams(search).get("werver")
   const viewedAs = werver ? { wervernr: werver, name: werver } : undefined
   if (view === "walk") return { view: "areas", viewedAs }
+  if (view === "tick") return { view: "planning" }
   if (view === "map") return { view: "map", map: {} }
   return { view, viewedAs }
 }
