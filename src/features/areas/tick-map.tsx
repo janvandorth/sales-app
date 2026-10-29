@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react"
-import type { FilterSpecification, Map as MapLibreMap } from "maplibre-gl"
+import type { FilterSpecification, GeoJSONSource, Map as MapLibreMap } from "maplibre-gl"
 import { Button } from "@/components/ui/button"
 import { BACKGROUND_SOURCE, maplibregl, postcodeSource } from "../sales-map/map-setup"
+import { areaOutline, type Piece } from "./area-outline"
 import type { AreaAssignment, Bounds } from "./areas"
 import { codeAt, coveredBy, finerThan, pickLevel, type PostcodeLevel } from "./map-overlay"
 import type { Status } from "./tick"
@@ -18,12 +19,7 @@ const DONE = "#12293b"
 
 const oneOf = (codes: string[]): FilterSpecification => ["in", ["get", "postcode"], ["literal", codes]]
 
-/** The postcodes of a level with any of the area in them: those inside it, and the larger ones around a part. */
-function inArea(codes: string[], level: PostcodeLevel): FilterSpecification {
-  const length = Number(level.slice(2))
-  const around = codes.filter((c) => c.length > length).map((c) => c.slice(0, length))
-  return ["any", coveredBy(codes), oneOf([...new Set(around)])] as FilterSpecification
-}
+const EMPTY = { type: "FeatureCollection" as const, features: [] }
 
 type Props = {
   area: AreaAssignment
@@ -36,8 +32,8 @@ type Props = {
 }
 
 /**
- * The area on the map, what was walked filled as finely as the zoom allows, and the postcodes of the level picked
- * outlined: a tap ticks off the PC4, PC5 or PC6 under it, as outlined.
+ * The area on the map: what was walked filled as finely as the zoom allows, and the area's edge outlined per PC4,
+ * PC5 or PC6 picked. A tap inside the area ticks off the part of it in that outline.
  */
 export default function TickMap({ area, bounds, statuses, onTap }: Props) {
   const container = useRef<HTMLDivElement>(null)
@@ -46,12 +42,15 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
   const [shown, setShown] = useState<PostcodeLevel>("pc6")
   const [choice, setChoice] = useState<PostcodeLevel>("pc6")
   const level = pickLevel(shown, choice)
-  // The click handler is set up once; it reads the latest of these.
+  // The map's handlers are set up once; they read the latest of these.
   const latest = useRef({ level, onTap })
   latest.current = { level, onTap }
+  /** Merges the outline again, for another level picked; set once the map is there. */
+  const redraw = useRef<() => void>(() => {})
 
   useEffect(() => {
     if (!container.current) return
+    const inArea = coveredBy(area.postcodes)
     const m = new maplibregl.Map({
       container: container.current,
       ...(bounds
@@ -64,14 +63,12 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
           pc4: postcodeSource("pc4"),
           pc5: postcodeSource("pc5"),
           pc6: postcodeSource("pc6"),
+          outline: { type: "geojson", data: EMPTY },
         },
         layers: [
           { id: "background", type: "raster", source: "background" },
           ...LEVELS.flatMap((l) => {
-            const base = { source: l, "source-layer": l, minzoom: MIN_ZOOM[l] }
-            // What was walked and the area's own postcodes, at the finest level the zoom has: a PC4 picked shows
-            // the PC6s done in it, not the whole PC4 filled.
-            const finest = { ...base, maxzoom: MAX_ZOOM[l] }
+            const finest = { source: l, "source-layer": l, minzoom: MIN_ZOOM[l], maxzoom: MAX_ZOOM[l] }
             return [
               {
                 ...finest,
@@ -87,48 +84,90 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
                 filter: oneOf([]),
                 paint: { "fill-color": DONE, "fill-opacity": 0.55 },
               },
+              // What a tap hits: the area's postcodes, unseen. On at every zoom from the level's start, so its tiles
+              // are loaded for the outline.
               {
-                ...finest,
-                id: `${l}-area`,
-                type: "line" as const,
-                filter: coveredBy(area.postcodes),
-                paint: { "line-color": DONE, "line-width": 0.75, "line-opacity": 0.4 },
-              },
-              // What a tap picks: the postcodes of the level picked; shown for that level only.
-              {
-                ...base,
-                id: `${l}-line`,
-                type: "line" as const,
-                layout: { visibility: "none" as const },
-                filter: inArea(area.postcodes, l),
-                paint: { "line-color": DONE, "line-width": 2, "line-opacity": 0.85 },
-              },
-              // What a tap at this level hits: the area's postcodes, unseen.
-              {
-                ...base,
+                source: l,
+                "source-layer": l,
+                minzoom: MIN_ZOOM[l],
                 id: `${l}-hit`,
                 type: "fill" as const,
-                filter: inArea(area.postcodes, l),
+                filter: inArea,
                 paint: { "fill-color": DONE, "fill-opacity": 0 },
               },
             ]
           }),
+          {
+            id: "outline",
+            type: "line",
+            source: "outline",
+            paint: { "line-color": DONE, "line-width": 2.5, "line-opacity": 0.9 },
+          },
         ],
       },
     })
+
+    /**
+     * The area's edge per code of the level picked. Each part comes from the shape it was given out as (a PC5
+     * "3561A" as its PC5), or the level picked where that is smaller: merged PC6s would leave the streets between
+     * them as gaps. Where the zoom has no tiles for that level yet, the smallest it has.
+     */
+    let drawn = ""
+    function outline() {
+      const { level } = latest.current
+      const length = Number(level.slice(2))
+      const finest = Number(levelAt(m.getZoom()).slice(2))
+      const parts: Piece[] = area.postcodes.flatMap((code) => {
+        const source = `pc${Math.min(Math.max(code.length, length), finest)}`
+        return m
+          .querySourceFeatures(source, { sourceLayer: source, filter: coveredBy([code]) })
+          .flatMap((f) =>
+            typeof f.properties.postcode === "string"
+              ? [{ postcode: f.properties.postcode, geometry: f.geometry }]
+              : [],
+          )
+      })
+      // Once per level and set of shapes: panning over loaded tiles changes nothing.
+      const key = `${level}|${finest}|${parts.length}`
+      if (key === drawn) return
+      drawn = key
+      const merged = areaOutline(parts, length)
+      ;(m.getSource("outline") as GeoJSONSource | undefined)?.setData(merged as Parameters<GeoJSONSource["setData"]>[0])
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const later = () => {
+      clearTimeout(timer)
+      timer = setTimeout(outline, 150)
+    }
+
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
     m.on("load", () => setLoaded(true))
     m.on("zoomend", () => setShown(levelAt(m.getZoom())))
+    m.on("moveend", later)
+    m.on("sourcedata", (event) => {
+      if (event.sourceId !== "outline" && event.isSourceLoaded) later()
+    })
     m.on("click", (event) => {
       const { level, onTap } = latest.current
-      const feature = m.queryRenderedFeatures(event.point, { layers: [`${level}-hit`] })[0]
+      const feature = m.queryRenderedFeatures(event.point, { layers: [`${levelAt(m.getZoom())}-hit`] })[0]
       const postcode = feature?.properties?.postcode
       if (typeof postcode === "string") onTap(codeAt(postcode, level))
     })
     setShown(levelAt(m.getZoom()))
     map.current = m
-    return () => m.remove()
+    redraw.current = () => {
+      drawn = ""
+      outline()
+    }
+    return () => {
+      clearTimeout(timer)
+      m.remove()
+    }
   }, [area, bounds])
+
+  useEffect(() => {
+    if (loaded) redraw.current()
+  }, [level, loaded])
 
   useEffect(() => {
     const m = map.current
@@ -141,13 +180,6 @@ export default function TickMap({ area, bounds, statuses, onTap }: Props) {
       m.setFilter(`${l}-part`, oneOf(of("part")))
     }
   }, [statuses, loaded])
-
-  // The level a tap picks is outlined whatever the zoom: what is outlined is what a tap ticks off.
-  useEffect(() => {
-    const m = map.current
-    if (!m || !loaded) return
-    for (const l of LEVELS) m.setLayoutProperty(`${l}-line`, "visibility", l === level ? "visible" : "none")
-  }, [level, loaded])
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
