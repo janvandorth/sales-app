@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { codeAt, coveredBy, pickLevel } from "./map-overlay"
+import { codeAt, coveredBy, finerThan, pickLevel } from "./map-overlay"
 
 describe("picking at a larger level", () => {
   it("picks the larger area chosen while zoomed in further", () => {
@@ -11,7 +11,13 @@ describe("picking at a larger level", () => {
   it("never picks smaller than the map shows", () => {
     expect(pickLevel("pc4", "pc5")).toBe("pc4")
     expect(pickLevel("pc5", "pc5")).toBe("pc5")
-    expect(pickLevel("pc6", "zoom")).toBe("pc6")
+    expect(pickLevel("pc6", "pc6")).toBe("pc6")
+  })
+
+  it("knows which levels are smaller than the map shows", () => {
+    expect(finerThan("pc6", "pc5")).toBe(true)
+    expect(finerThan("pc5", "pc5")).toBe(false)
+    expect(finerThan("pc4", "pc6")).toBe(false)
   })
 
   it("finds the code of the area around a street", () => {

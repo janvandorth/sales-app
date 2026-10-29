@@ -36,11 +36,11 @@ import {
   codeAt,
   geometryBounds,
   overlayLayers,
+  finerThan,
   pickLevel,
   setHover,
   sourceBounds,
   type Overlay,
-  type PickChoice,
 } from "../areas/map-overlay"
 import { useAreaAssignments, useCreateAreaAssignment, useRecruiters } from "../areas/use-areas"
 import { addDays, formatDay, today } from "../dashboard/periods"
@@ -176,7 +176,8 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
   )
   const [chosen, setChosen] = useState<string[]>(assign?.wervernr ? [assign.wervernr] : [])
   const [picked, setPicked] = useState<PickedArea[]>([])
-  const [pickAt, setPickAt] = useState<PickChoice>("zoom")
+  // The level areas are picked at; PC6 follows the zoom, a larger one holds at every zoom.
+  const [pickAt, setPickAt] = useState<Level>("pc6")
   const [note, setNote] = useState("")
   const [naming, setNaming] = useState(false)
   const recruiters = useRecruiters(assigning)
@@ -219,6 +220,8 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
   // Zoomed in to streets, the PC5 areas stay until the first streets have arrived, so the map never goes blank.
   const shown: Level =
     bbox === null ? "pc4" : level === "pc6" && current.pc6.size === 0 && detailQuery.isFetching ? "pc5" : level
+  // Giving out areas, the outlines are those of the level a tap picks.
+  const outlined = assigning ? pickLevel(shown, pickAt) : null
   // PC4 fades to a tint only once the finer level has something to show.
   const faint = shown !== "pc4" && current[shown].size > 0
   const fetching = bbox !== null && detailQuery.isFetching
@@ -384,12 +387,8 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
         {assigning && (
           <Choice
             label="Selecteren"
-            options={[
-              { value: "zoom", label: "Per zoom" },
-              { value: "pc5", label: "Hele PC5" },
-              { value: "pc4", label: "Hele PC4" },
-            ]}
-            value={pickAt}
+            options={LEVELS.map((l) => ({ value: l, label: l.toUpperCase(), disabled: finerThan(l, shown) }))}
+            value={outlined ?? pickAt}
             onChange={setPickAt}
           />
         )}
@@ -427,6 +426,7 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
           shades={shades}
           seen={current}
           shown={shown}
+          outlined={outlined}
           faint={faint}
           popup={popup}
           overlay={overlay}
@@ -535,7 +535,7 @@ type PopupFor = {
   /** Set while giving out areas: a tap picks or drops the area under it instead of explaining it. */
   pick?: (postcode: string, level: Level, bounds: Bounds) => void
   /** The level a tap picks at, when larger than the map's. */
-  pickAt?: PickChoice
+  pickAt?: Level
 }
 
 type MapProps = {
@@ -546,6 +546,8 @@ type MapProps = {
   seen: Seen
   /** Which level is drawn in full besides PC4. */
   shown: Level
+  /** Giving out areas: the only level outlined, whatever the zoom. */
+  outlined: Level | null
   /** Whether PC4 is only a tint under it. */
   faint: boolean
   popup: { current: PopupFor }
@@ -571,7 +573,7 @@ const LEVELS: Level[] = ["pc4", "pc5", "pc6"]
  * The MapLibre map. All three levels are vector tiles (map-setup's TILES_URL), coloured by feature state, so new numbers
  * never reload an outline. MapLibre keeps only the tiles near the view in memory.
  */
-function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onView, onDrawing }: MapProps) {
+function SalesMap({ mode, shades, seen, shown, outlined, faint, popup, overlay, fitTo, onView, onDrawing }: MapProps) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const viewChanged = useRef(onView)
@@ -633,8 +635,8 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
               layout: { visibility: level === "pc4" ? ("visible" as const) : ("none" as const) },
               paint: {
                 "line-color": "#334155",
-                "line-width": level === "pc6" ? 0.4 : 0.5,
-                "line-opacity": ["case", SHADED, 0.6, 0.15] as ExpressionSpecification,
+                "line-width": lineWidth(level),
+                "line-opacity": LINE_OPACITY,
               },
             },
           ]),
@@ -693,7 +695,7 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
       const shownLevel = shownRef.current
       const [feature] = map.queryRenderedFeatures(point, { layers: [`${shownLevel}-fill`] })
       if (feature?.id === undefined) return null
-      const at = pickLevel(shownLevel, popup.current.pickAt ?? "zoom")
+      const at = pickLevel(shownLevel, popup.current.pickAt ?? "pc6")
       return { feature, at, code: codeAt(String(feature.id), at), own: at === shownLevel }
     }
     let hovered: string | null = null
@@ -745,7 +747,7 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
     }
   }, [popup])
 
-  // The colours per mode, and which level is drawn in full.
+  // The colours per mode, which level is drawn in full, and which is outlined.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loaded) return
@@ -753,11 +755,16 @@ function SalesMap({ mode, shades, seen, shown, faint, popup, overlay, fitTo, onV
       const paint = statePaint(mode, level === "pc4" && faint)
       map.setPaintProperty(`${level}-fill`, "fill-color", paint["fill-color"])
       map.setPaintProperty(`${level}-fill`, "fill-opacity", paint["fill-opacity"])
-      const visibility = level === "pc4" || level === shown ? "visible" : "none"
-      map.setLayoutProperty(`${level}-fill`, "visibility", visibility)
-      map.setLayoutProperty(`${level}-line`, "visibility", visibility)
+      const drawn = level === "pc4" || level === shown
+      map.setLayoutProperty(`${level}-fill`, "visibility", drawn ? "visible" : "none")
+      const lined = outlined === null ? drawn : level === outlined
+      map.setLayoutProperty(`${level}-line`, "visibility", lined ? "visible" : "none")
+      // A larger level outlined over the shades of a smaller one needs a firm line to read as the boxes to pick.
+      const firm = level === outlined && level !== shown
+      map.setPaintProperty(`${level}-line`, "line-width", firm ? 1.5 : lineWidth(level))
+      map.setPaintProperty(`${level}-line`, "line-opacity", firm ? 0.8 : LINE_OPACITY)
     }
-  }, [mode, shown, faint, loaded])
+  }, [mode, shown, outlined, faint, loaded])
 
   // Shade every PC4 area the backend sent; the others stay transparent.
   useEffect(() => {
@@ -819,6 +826,11 @@ const MIN_ZOOM: Record<Level, number> = { pc4: 0, pc5: PC5_ZOOM, pc6: STREET_ZOO
 const MAX_ZOOM: Record<Level, number> = { pc4: PC5_ZOOM, pc5: STREET_ZOOM, pc6: 24 }
 
 const SHADED: ExpressionSpecification = ["boolean", ["feature-state", "shaded"], false]
+
+/** Outlines are clearer around shaded areas than around empty ones. */
+const LINE_OPACITY: ExpressionSpecification = ["case", SHADED, 0.6, 0.15]
+
+const lineWidth = (level: Level) => (level === "pc6" ? 0.4 : 0.5)
 
 type FillPaint = { "fill-color": ExpressionSpecification; "fill-opacity": ExpressionSpecification }
 
@@ -995,7 +1007,7 @@ function wozOptions(view: OpportunitiesView | undefined): { value: WozBand; labe
 
 type ChoiceProps<T extends string | number> = {
   label: string
-  options: { value: T; label: string }[]
+  options: { value: T; label: string; disabled?: boolean }[]
   value: T
   onChange: (value: T) => void
 }
@@ -1010,6 +1022,7 @@ function Choice<T extends string | number>({ label, options, value, onChange }: 
           size="sm"
           variant={o.value === value ? "default" : "ghost"}
           aria-pressed={o.value === value}
+          disabled={o.disabled}
           onClick={() => onChange(o.value)}
         >
           {o.label}

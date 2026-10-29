@@ -17,14 +17,14 @@ export type Overlay = { picked: string[]; taken: string[] }
 
 export type PostcodeLevel = "pc4" | "pc5" | "pc6"
 
-/** What a tap picks: the area at the zoom's level, or always the PC5 or PC4 around it. */
-export type PickChoice = "zoom" | "pc5" | "pc4"
-
 const CODE_LENGTH: Record<PostcodeLevel, number> = { pc4: 4, pc5: 5, pc6: 6 }
 
-/** The level a tap picks at: the chosen one when it is larger than what the map shows, else the map's. */
-export function pickLevel(shown: PostcodeLevel, choice: PickChoice): PostcodeLevel {
-  return choice !== "zoom" && CODE_LENGTH[choice] < CODE_LENGTH[shown] ? choice : shown
+/** Whether `level` is smaller than `than`: a tap never picks smaller than the map shows. */
+export const finerThan = (level: PostcodeLevel, than: PostcodeLevel) => CODE_LENGTH[level] > CODE_LENGTH[than]
+
+/** The level a tap picks at: the chosen one, or what the map shows when the chosen one is smaller. */
+export function pickLevel(shown: PostcodeLevel, choice: PostcodeLevel): PostcodeLevel {
+  return finerThan(choice, shown) ? shown : choice
 }
 
 /** The code at `level` of the area that holds `postcode`: "3561AC" at PC5 is "3561A". */
