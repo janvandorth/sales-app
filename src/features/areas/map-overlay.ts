@@ -8,8 +8,8 @@ import type {
 import { partlyPicked, unionBounds, type Bounds } from "./areas"
 
 /**
- * The areas drawn over the shades: those given out to someone else in the chosen period (hatched), the selection
- * (a thick orange outline) and the larger areas that hold part of it (dashed). Drawn by filters on the postcode
+ * The areas drawn over the shades: those given out to someone else in the chosen period (red stripes), the selection
+ * (a thick green outline) and the larger areas that hold part of it (dashed). Drawn by filters on the postcode
  * in the tiles, so nothing is fetched and every level shows a code of any level.
  */
 
@@ -30,10 +30,11 @@ export function pickLevel(shown: PostcodeLevel, choice: PostcodeLevel): Postcode
 /** The code at `level` of the area that holds `postcode`: "3561AC" at PC5 is "3561A". */
 export const codeAt = (postcode: string, level: PostcodeLevel) => postcode.slice(0, CODE_LENGTH[level])
 
-export const PICKED_COLOR = "#ea580c"
+/** Green, so the selection never reads as the red of the areas already given out, nor as a sales shade. */
+export const PICKED_COLOR = "#15803d"
 
-/** A light red over the picked areas, so the selection reads as one block; the kansen shade still shows through. */
-const PICKED_FILL = "#ef4444"
+/** A light green over the picked areas, so the selection reads as one block; the shade still shows through. */
+const PICKED_FILL = "#22c55e"
 
 const POSTCODE: ExpressionSpecification = ["get", "postcode"]
 
@@ -131,14 +132,14 @@ export function geometryBounds(geometry: MapGeoJSONFeature["geometry"]): Bounds 
   return box
 }
 
-/** Slate diagonal stripes on transparent, 8×8, for the "hatch" fill pattern. */
+/** Dark red diagonal stripes on transparent, 8×8, for the "hatch" fill pattern: areas already given out. */
 export function addHatch(map: MapLibreMap): void {
   const size = 8
   const data = new Uint8Array(size * size * 4)
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      if ((x + y) % size >= 2) continue
-      data.set([51, 65, 85, 150], (y * size + x) * 4)
+      if ((x + y) % size >= 3) continue
+      data.set([185, 28, 28, 200], (y * size + x) * 4)
     }
   }
   map.addImage("hatch", { width: size, height: size, data }, { pixelRatio: 2 })

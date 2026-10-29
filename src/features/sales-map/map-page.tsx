@@ -393,7 +393,7 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
           />
         )}
         {focus && !assigning && (
-          <Badge className="border-orange-600 bg-orange-50 text-orange-800">{areaTitle(focus)}</Badge>
+          <Badge className="border-green-700 bg-green-50 text-green-800">{areaTitle(focus)}</Badge>
         )}
         {mode === "sales" ? (
           <>
