@@ -185,6 +185,16 @@ export function codesLabel(codes: string[]): string {
 /** "Sanne" from "Sanne de Wit": wervers know each other by first name. */
 export const firstName = (name: string) => name.split(" ")[0]
 
+/**
+ * Who has the area a postcode lies in, one line per assignment covering it: "Sanne + Daan · wo–vr". Empty when
+ * nobody has it.
+ */
+export function takenBy(given: AreaAssignment[], postcode: string): string[] {
+  return given
+    .filter((a) => a.postcodes.some((code) => covers(code, postcode)))
+    .map((a) => `${a.members.map((m) => firstName(m.name)).join(" + ")} · ${spanLabel(a.startsOn, a.endsOn, true)}`)
+}
+
 /** The title of an area: its neighbourhood, else its codes. */
 export const areaTitle = (a: Pick<AreaAssignment, "label" | "postcodes">) => a.label || codesLabel(a.postcodes)
 

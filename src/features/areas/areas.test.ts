@@ -9,9 +9,11 @@ import {
   placeLabel,
   spanLabel,
   summarize,
+  takenBy,
   toggleCode,
   tooBig,
   unionBounds,
+  type AreaAssignment,
   type PickedArea,
 } from "./areas"
 
@@ -129,5 +131,33 @@ describe("names and sizes", () => {
       ]),
     ).toEqual([4.9, 52, 5.1, 52.2])
     expect(unionBounds([])).toBeNull()
+  })
+})
+
+describe("areas given out", () => {
+  const given = (postcodes: string[], names: string[], startsOn: string, endsOn: string): AreaAssignment => ({
+    id: postcodes.join(),
+    postcodes,
+    wervernrs: names,
+    startsOn,
+    endsOn,
+    label: "",
+    note: "",
+    bounds: null,
+    households: null,
+    open: null,
+    members: names.map((name) => ({ wervernr: name, name })),
+    sold: 0,
+    visited: 0,
+  })
+
+  it("names who has the area a postcode lies in, and on which days", () => {
+    const areas = [
+      given(["3561A"], ["Jan van Dorth"], "2026-10-28", "2026-10-30"),
+      given(["3561BC"], ["Sanne de Wit", "Daan Smit"], "2026-10-29", "2026-10-29"),
+    ]
+    expect(takenBy(areas, "3561AB")).toEqual(["Jan · wo–vr"])
+    expect(takenBy(areas, "3561BC")).toEqual(["Sanne + Daan · do"])
+    expect(takenBy(areas, "3561BD")).toEqual([])
   })
 })

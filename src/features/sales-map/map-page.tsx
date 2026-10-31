@@ -23,6 +23,7 @@ import {
   periodsFor,
   pickArea,
   summarize,
+  takenBy,
   unionBounds,
   type AreaAssignment,
   type AssignStart,
@@ -300,6 +301,7 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
     popup.current = {
       // Giving out areas, a tap picks the area with what is known of it now, so its numbers survive panning away.
       pickAt,
+      whoHas: assigning ? (postcode) => takenBy(given.data ?? [], postcode) : undefined,
       pick: assigning
         ? (postcode, at, bounds) => {
             const area = (at === "pc4" ? kansenAreas.get(postcode) : current[at].get(postcode)) as
@@ -359,6 +361,7 @@ export function SalesMapPage({ onBack, isAdmin = false, assign, focus }: Props) 
     yearAreas,
     yearDetail,
     yearStreets,
+    given.data,
   ])
 
   return (
@@ -536,6 +539,8 @@ type PopupFor = {
   pick?: (postcode: string, level: Level, bounds: Bounds) => void
   /** The level a tap picks at, when larger than the map's. */
   pickAt?: Level
+  /** Set while giving out areas: who already has the area a postcode lies in, one line each. */
+  whoHas?: (postcode: string) => string[]
 }
 
 type MapProps = {
@@ -705,8 +710,34 @@ function SalesMap({ mode, shades, seen, shown, outlined, faint, popup, overlay, 
       setHover(map, LEVELS, code)
       map.getCanvas().style.cursor = code ? "pointer" : ""
     }
-    map.on("mousemove", (event) => hover(popup.current.pick ? (target(event.point)?.code ?? null) : null))
-    map.on("mouseout", () => hover(null))
+    // Over an area given out (hatched), who has it, next to the pointer.
+    const tip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: "map-tip" })
+    let tipFor = ""
+    const showTip = (lines: string[], at: maplibregl.LngLat) => {
+      if (lines.length === 0) {
+        tipFor = ""
+        return void tip.remove()
+      }
+      const text = lines.join("\n")
+      if (text !== tipFor) {
+        tipFor = text
+        const box = document.createElement("div")
+        box.className = "text-sm font-medium whitespace-pre-line"
+        box.textContent = text
+        tip.setDOMContent(box)
+      }
+      tip.setLngLat(at)
+      if (!tip.isOpen()) tip.addTo(map)
+    }
+    map.on("mousemove", (event) => {
+      const hit = popup.current.pick ? target(event.point) : null
+      hover(hit?.code ?? null)
+      showTip(hit ? (popup.current.whoHas?.(String(hit.feature.id)) ?? []) : [], event.lngLat)
+    })
+    map.on("mouseout", () => {
+      hover(null)
+      showTip([], map.getCenter())
+    })
 
     map.on("click", (event) => {
       const level = shownRef.current
@@ -742,6 +773,7 @@ function SalesMap({ mode, shades, seen, shown, outlined, faint, popup, overlay, 
     return () => {
       clearTimeout(wait)
       info.remove()
+      tip.remove()
       map.remove()
       mapRef.current = null
     }

@@ -133,3 +133,8 @@
     @apply font-sans;
   }
 }
+
+/* Who has an area given out, next to the pointer on the map: never in the pointer's way. */
+.map-tip {
+  pointer-events: none;
+}
